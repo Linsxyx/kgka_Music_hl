@@ -746,6 +746,40 @@ class MusicCommentResponse {
   }
 }
 
+class SearchHotKeyword {
+  const SearchHotKeyword({
+    required this.keyword,
+    this.reason,
+  });
+
+  final String keyword;
+  final String? reason;
+
+  factory SearchHotKeyword.fromJson(Map<String, dynamic> json) {
+    return SearchHotKeyword(
+      keyword: asString(json['keyword']) ?? '',
+      reason: asString(json['reason']),
+    );
+  }
+}
+
+class SearchHotCategory {
+  const SearchHotCategory({required this.name, required this.keywords});
+
+  final String name;
+  final List<SearchHotKeyword> keywords;
+
+  factory SearchHotCategory.fromJson(Map<String, dynamic> json) {
+    return SearchHotCategory(
+      name: asString(json['name']) ?? '',
+      keywords: asList(json['keywords'])
+          .whereType<Map<String, dynamic>>()
+          .map(SearchHotKeyword.fromJson)
+          .toList(),
+    );
+  }
+}
+
 String? asString(Object? value) {
   if (value == null) {
     return null;

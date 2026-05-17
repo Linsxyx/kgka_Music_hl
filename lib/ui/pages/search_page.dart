@@ -29,7 +29,8 @@ class _SearchPageState extends State<SearchPage> {
   final _focusNode = FocusNode();
   Timer? _debounce;
 
-  List<String> _hotKeywords = const [];
+  List<SearchHotCategory> _hotCategories = const [];
+  var _hotLoading = true;
   List<String> _suggestions = const [];
   List<Song> _results = const [];
   bool _loading = false;
@@ -53,9 +54,16 @@ class _SearchPageState extends State<SearchPage> {
 
   Future<void> _loadHotKeywords() async {
     try {
-      final keywords = await widget.api.searchHotKeywords();
-      if (mounted) setState(() => _hotKeywords = keywords);
-    } catch (_) {}
+      final categories = await widget.api.searchHotKeywords();
+      if (mounted) setState(() {
+        _hotCategories = categories;
+        _hotLoading = false;
+      });
+    } catch (_) {
+      if (mounted) {
+        setState(() => _hotLoading = false);
+      }
+    }
   }
 
   void _onTextChanged() {
@@ -198,8 +206,14 @@ class _SearchPageState extends State<SearchPage> {
     }
 
     if (text.isEmpty) {
-      return _HotKeywords(
-        keywords: _hotKeywords,
+      if (_hotLoading) {
+        return const _HotSearchSkeleton();
+      }
+      if (_hotCategories.isEmpty) {
+        return const SizedBox.shrink();
+      }
+      return _HotSearchPanel(
+        categories: _hotCategories,
         onTap: _onKeywordTap,
       );
     }
@@ -215,63 +229,325 @@ class _SearchPageState extends State<SearchPage> {
   }
 }
 
-class _HotKeywords extends StatelessWidget {
-  const _HotKeywords({required this.keywords, required this.onTap});
+class _HotSearchSkeleton extends StatelessWidget {
+  const _HotSearchSkeleton();
 
-  final List<String> keywords;
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(18, 8, 18, 160),
+      children: [
+        _SkeletonBlock(height: 22, width: 80),
+        const SizedBox(height: 14),
+        SizedBox(
+          height: 36,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            itemCount: 6,
+            separatorBuilder: (_, _) => const SizedBox(width: 10),
+            itemBuilder: (_, _) => const _SkeletonBlock(height: 32, width: 72, radius: 16),
+          ),
+        ),
+        const SizedBox(height: 22),
+        for (var i = 0; i < 10; i++) ...[
+          Padding(
+            padding: EdgeInsets.only(bottom: i < 9 ? 10 : 0),
+            child: Row(
+              children: [
+                const _SkeletonBlock(height: 16, width: 22),
+                const SizedBox(width: 14),
+                const Expanded(child: _SkeletonBlock(height: 16)),
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _SkeletonBlock extends StatefulWidget {
+  const _SkeletonBlock({this.height = 16, this.width, this.radius = 4});
+
+  final double height;
+  final double? width;
+  final double radius;
+
+  @override
+  State<_SkeletonBlock> createState() => _SkeletonBlockState();
+}
+
+class _SkeletonBlockState extends State<_SkeletonBlock>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat(reverse: true);
+    _animation = Tween(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOutSine),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return AnimatedBuilder(
+      animation: _animation,
+      builder: (context, _) {
+        final alpha = isDark
+            ? .06 + _animation.value * .08
+            : .08 + _animation.value * .10;
+        return Container(
+          height: widget.height,
+          width: widget.width,
+          decoration: BoxDecoration(
+            color: Theme.of(context)
+                .colorScheme
+                .onSurface
+                .withValues(alpha: alpha),
+            borderRadius: BorderRadius.circular(widget.radius),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _HotSearchPanel extends StatefulWidget {
+  const _HotSearchPanel({required this.categories, required this.onTap});
+
+  final List<SearchHotCategory> categories;
   final ValueChanged<String> onTap;
+
+  @override
+  State<_HotSearchPanel> createState() => _HotSearchPanelState();
+}
+
+class _HotSearchPanelState extends State<_HotSearchPanel> {
+  late final PageController _pageController;
+  var _page = 0;
+  var _pageScrolling = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController();
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    if (keywords.isEmpty) {
-      return const SizedBox.shrink();
-    }
+    final categories = widget.categories;
+    if (categories.isEmpty) return const SizedBox.shrink();
 
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(18, 8, 18, 160),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.only(bottom: 14),
+          padding: const EdgeInsets.fromLTRB(18, 8, 0, 0),
           child: Text(
-            '热门搜索',
+            '热搜',
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
               fontWeight: FontWeight.w900,
               fontSize: 20,
             ),
           ),
         ),
-        Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          children: [
-            for (final keyword in keywords)
-              InkWell(
-                borderRadius: BorderRadius.circular(20),
-                onTap: () => onTap(keyword),
-                child: Ink(
-                  decoration: BoxDecoration(
-                    color: colorScheme.surfaceContainerHighest.withValues(
-                      alpha: .64,
-                    ),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 10,
-                  ),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 36,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 18),
+            itemCount: categories.length,
+            separatorBuilder: (_, _) => const SizedBox(width: 10),
+            itemBuilder: (context, index) {
+              final active = index == _page;
+              return _CategoryTab(
+                label: categories[index].name,
+                active: active,
+                onTap: () {
+                  _pageScrolling = true;
+                  _pageController.animateToPage(
+                    index,
+                    duration: const Duration(milliseconds: 260),
+                    curve: Curves.easeOutCubic,
+                  );
+                },
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 12),
+        Expanded(
+          child: NotificationListener<ScrollNotification>(
+            onNotification: (notification) {
+              if (notification is ScrollStartNotification) {
+                _pageScrolling = true;
+              } else if (notification is ScrollEndNotification) {
+                final page = (_pageController.page ?? _page.toDouble())
+                    .round()
+                    .clamp(0, categories.length - 1);
+                setState(() {
+                  _page = page;
+                  _pageScrolling = false;
+                });
+              }
+              return false;
+            },
+            child: PageView.builder(
+              controller: _pageController,
+              onPageChanged: (page) {
+                if (!_pageScrolling) setState(() => _page = page);
+              },
+              itemCount: categories.length,
+              itemBuilder: (context, index) {
+                return _CategoryKeywordList(
+                  keywords: categories[index].keywords,
+                  onTap: widget.onTap,
+                );
+              },
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _CategoryTab extends StatelessWidget {
+  const _CategoryTab({
+    required this.label,
+    required this.active,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool active;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Material(
+      color: active
+          ? colorScheme.primary
+          : colorScheme.surfaceContainerHighest.withValues(alpha: .7),
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+          child: Text(
+            label,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: active ? colorScheme.onPrimary : colorScheme.onSurface,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CategoryKeywordList extends StatelessWidget {
+  const _CategoryKeywordList({required this.keywords, required this.onTap});
+
+  final List<SearchHotKeyword> keywords;
+  final ValueChanged<String> onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(18, 0, 18, 160),
+      itemCount: keywords.length,
+      itemBuilder: (context, index) {
+        final item = keywords[index];
+        final rank = index + 1;
+        return InkWell(
+          onTap: () => onTap(item.keyword),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 11),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 28,
                   child: Text(
-                    keyword,
+                    '$rank',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      fontWeight: _rankWeight(rank),
+                      color: _rankColor(rank, colorScheme),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    item.keyword,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                       fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
-              ),
-          ],
-        ),
-      ],
+                if (rank <= 3 && item.reason != null && item.reason!.isNotEmpty)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: _rankColor(rank, colorScheme).withValues(alpha: .14),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      '热',
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: _rankColor(rank, colorScheme),
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
     );
+  }
+
+  FontWeight _rankWeight(int rank) {
+    return rank <= 3 ? FontWeight.w900 : FontWeight.w600;
+  }
+
+  Color _rankColor(int rank, ColorScheme colorScheme) {
+    return switch (rank) {
+      1 => const Color(0xFFFF2D55),
+      2 => const Color(0xFFFF6B35),
+      3 => const Color(0xFFFFB020),
+      _ => colorScheme.onSurfaceVariant,
+    };
   }
 }
 

@@ -261,19 +261,12 @@ class MusicApi {
     );
   }
 
-  Future<List<String>> searchHotKeywords() async {
+  Future<List<SearchHotCategory>> searchHotKeywords() async {
     final json = asMap(await _client.get('/search/hot'));
-    final categories = asList(json['category']);
-    final keywords = <String>[];
-    for (final category in categories.whereType<Map<String, dynamic>>()) {
-      for (final item in asList(
-        category['keywords'],
-      ).whereType<Map<String, dynamic>>()) {
-        final keyword = asString(item['keyword']);
-        if (keyword != null) keywords.add(keyword);
-      }
-    }
-    return keywords;
+    return asList(json['list'])
+        .whereType<Map<String, dynamic>>()
+        .map(SearchHotCategory.fromJson)
+        .toList();
   }
 
   Future<List<String>> searchSuggest(String keywords) async {
