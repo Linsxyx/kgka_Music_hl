@@ -18,6 +18,7 @@ class AuthController extends ChangeNotifier {
 
   final MusicApi _api;
 
+  bool isRestoring = true;
   bool isLoading = false;
   String? errorMessage;
   LoginSession? session;
@@ -74,9 +75,7 @@ class AuthController extends ChangeNotifier {
   }
 
   List<PlaylistSummary> get createdPlaylists {
-    return playlists
-        .where((playlist) => playlist.isCreatedPlaylist)
-        .toList();
+    return playlists.where((playlist) => playlist.isCreatedPlaylist).toList();
   }
 
   List<PlaylistSummary> get collectedPlaylists {
@@ -89,23 +88,29 @@ class AuthController extends ChangeNotifier {
   }
 
   Future<void> restore() async {
-    final prefs = await SharedPreferences.getInstance();
-    final restored = LoginSession(
-      userId: prefs.getString(_userIdKey),
-      token: prefs.getString(_tokenKey),
-      t1: prefs.getString(_t1Key),
-    );
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final restored = LoginSession(
+        userId: prefs.getString(_userIdKey),
+        token: prefs.getString(_tokenKey),
+        t1: prefs.getString(_t1Key),
+      );
 
-    if (!restored.isValid) {
-      return;
+      if (!restored.isValid) {
+        return;
+      }
+
+      session = restored;
+      _api.setSession(restored);
+      playlists = await _loadCachedPlaylists();
+      await _loadLikedHashes();
+      await refreshProfile(silent: true);
+    } catch (error) {
+      errorMessage = error.toString();
+    } finally {
+      isRestoring = false;
+      notifyListeners();
     }
-
-    session = restored;
-    _api.setSession(restored);
-    playlists = await _loadCachedPlaylists();
-    await _loadLikedHashes();
-    notifyListeners();
-    await refreshProfile();
   }
 
   Future<void> sendCode(String mobile) async {
@@ -176,10 +181,7 @@ class AuthController extends ChangeNotifier {
 
   Future<void> _persistLikedHashes() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(
-      _likedHashesKey,
-      jsonEncode(_likedHashes.toList()),
-    );
+    await prefs.setString(_likedHashesKey, jsonEncode(_likedHashes.toList()));
   }
 
   Future<void> _loadLikedHashes() async {

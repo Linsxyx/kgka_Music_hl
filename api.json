@@ -5,20 +5,16 @@
     "description": "酷狗音乐API",
     "version": "v1"
   },
-  "servers": [
-    {
-      "url": "https://localhost:7293/"
-    }
-  ],
   "paths": {
     "/album/shop": {
       "get": {
         "tags": [
           "Album"
         ],
+        "summary": "新碟上架。",
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "新碟上架列表。"
           }
         }
       }
@@ -28,10 +24,12 @@
         "tags": [
           "Album"
         ],
+        "summary": "专辑信息。",
         "parameters": [
           {
             "name": "album_id",
             "in": "query",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -39,6 +37,7 @@
           {
             "name": "fields",
             "in": "query",
+            "description": "需要返回的信息字段。",
             "schema": {
               "type": "string"
             }
@@ -46,7 +45,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "专辑相关信息。"
           }
         }
       }
@@ -56,10 +55,13 @@
         "tags": [
           "Album"
         ],
+        "summary": "专辑详情。",
         "parameters": [
           {
             "name": "id",
             "in": "query",
+            "description": "专辑 id。",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -67,7 +69,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "专辑详情。"
           }
         }
       }
@@ -82,7 +84,8 @@
           {
             "name": "id",
             "in": "query",
-            "description": "专辑 ID。",
+            "description": "专辑 ID。用户歌单里的MusiclibId就是专辑id",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -154,10 +157,13 @@
         "tags": [
           "Artist"
         ],
+        "summary": "关注歌手。",
         "parameters": [
           {
             "name": "id",
             "in": "query",
+            "description": "歌手 id。",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -165,7 +171,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "关注歌手结果。"
           }
         }
       }
@@ -175,10 +181,13 @@
         "tags": [
           "Artist"
         ],
+        "summary": "取消关注歌手。",
         "parameters": [
           {
             "name": "id",
             "in": "query",
+            "description": "歌手 id。",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -186,7 +195,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "取消关注歌手结果。"
           }
         }
       }
@@ -196,6 +205,7 @@
         "tags": [
           "Artist"
         ],
+        "summary": "获取关注歌手新歌。",
         "parameters": [
           {
             "name": "last_album_id",
@@ -213,6 +223,7 @@
           {
             "name": "pagesize",
             "in": "query",
+            "description": "每页页数。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -239,7 +250,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "关注歌手新歌列表。"
           }
         }
       }
@@ -249,10 +260,12 @@
         "tags": [
           "Artist"
         ],
+        "summary": "歌手荣誉。",
         "parameters": [
           {
             "name": "id",
             "in": "query",
+            "description": "歌手 id。",
             "schema": {
               "type": "string"
             }
@@ -260,6 +273,7 @@
           {
             "name": "page",
             "in": "query",
+            "description": "页码。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -273,6 +287,7 @@
           {
             "name": "pagesize",
             "in": "query",
+            "description": "每页页数。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -286,7 +301,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "歌手荣誉信息。"
           }
         }
       }
@@ -296,10 +311,12 @@
         "tags": [
           "Artist"
         ],
+        "summary": "获取歌手列表。",
         "parameters": [
           {
             "name": "musician",
             "in": "query",
+            "description": "是否音乐人。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -326,6 +343,7 @@
           {
             "name": "type",
             "in": "query",
+            "description": "歌手分类。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -339,6 +357,7 @@
           {
             "name": "hotsize",
             "in": "query",
+            "description": "返回热门数量。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -352,7 +371,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "歌手列表。"
           }
         }
       }
@@ -362,10 +381,12 @@
         "tags": [
           "Artist"
         ],
+        "summary": "获取歌手列表。",
         "parameters": [
           {
             "name": "sextype",
             "in": "query",
+            "description": "性别类型。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -379,6 +400,7 @@
           {
             "name": "type",
             "in": "query",
+            "description": "歌手分类。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -392,6 +414,7 @@
           {
             "name": "hotsize",
             "in": "query",
+            "description": "返回热门数量。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -405,7 +428,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "歌手列表。"
           }
         }
       }
@@ -415,10 +438,13 @@
         "tags": [
           "Artist"
         ],
+        "summary": "获取歌手MV。",
         "parameters": [
           {
             "name": "id",
             "in": "query",
+            "description": "歌手 ID。",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -426,6 +452,7 @@
           {
             "name": "page",
             "in": "query",
+            "description": "页码。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -439,6 +466,7 @@
           {
             "name": "pagesize",
             "in": "query",
+            "description": "每页数量。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -452,6 +480,7 @@
           {
             "name": "tag",
             "in": "query",
+            "description": "official: 官方版本，live：现场版本，fan：饭制版本，artist: 歌手发布, all: 获取全部，默认为获取全部",
             "schema": {
               "type": "string",
               "default": "all"
@@ -460,7 +489,24 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "歌手MV。",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArtistVideoResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArtistVideoResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArtistVideoResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -476,6 +522,7 @@
             "name": "id",
             "in": "query",
             "description": "歌手 ID。",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -516,6 +563,7 @@
             "name": "id",
             "in": "query",
             "description": "歌手 ID。",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -587,10 +635,13 @@
         "tags": [
           "Artist"
         ],
+        "summary": "获取歌手专辑。",
         "parameters": [
           {
             "name": "id",
             "in": "query",
+            "description": "歌手 ID。",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -598,6 +649,7 @@
           {
             "name": "page",
             "in": "query",
+            "description": "页码。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -611,6 +663,7 @@
           {
             "name": "pagesize",
             "in": "query",
+            "description": "每页数量。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -624,6 +677,7 @@
           {
             "name": "sort",
             "in": "query",
+            "description": "排序方式:new/hot",
             "schema": {
               "type": "string",
               "default": "new"
@@ -632,7 +686,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "歌手专辑列表。"
           }
         }
       }
@@ -642,12 +696,13 @@
         "tags": [
           "Captcha"
         ],
-        "summary": "发送手机验证码。",
+        "summary": "发送验证码。",
         "parameters": [
           {
             "name": "mobile",
             "in": "query",
             "description": "手机号。",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -682,10 +737,13 @@
         "tags": [
           "Comment"
         ],
+        "summary": "获取歌曲评论。",
         "parameters": [
           {
             "name": "mixsongid",
             "in": "query",
+            "description": "歌单下 mixsongid。歌手albumaudioid 专辑里没找到有这个字段",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -693,6 +751,7 @@
           {
             "name": "page",
             "in": "query",
+            "description": "页码。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -706,6 +765,7 @@
           {
             "name": "pagesize",
             "in": "query",
+            "description": "每页数量。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -719,7 +779,24 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "歌曲评论列表。",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/MusicCommentResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MusicCommentResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MusicCommentResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -729,10 +806,13 @@
         "tags": [
           "Comment"
         ],
+        "summary": "获取歌单评论。",
         "parameters": [
           {
             "name": "id",
             "in": "query",
+            "description": "歌单 global_collection_id。",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -740,6 +820,7 @@
           {
             "name": "page",
             "in": "query",
+            "description": "页码。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -753,6 +834,7 @@
           {
             "name": "pagesize",
             "in": "query",
+            "description": "每页数量。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -766,7 +848,24 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "歌单评论列表。",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/MusicCommentResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MusicCommentResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MusicCommentResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -776,10 +875,13 @@
         "tags": [
           "Comment"
         ],
+        "summary": "获取专辑评论。",
         "parameters": [
           {
             "name": "id",
             "in": "query",
+            "description": "专辑 ID。",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -787,6 +889,7 @@
           {
             "name": "page",
             "in": "query",
+            "description": "页码。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -800,6 +903,7 @@
           {
             "name": "pagesize",
             "in": "query",
+            "description": "每页数量。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -813,7 +917,24 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "专辑评论列表。",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/MusicCommentResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MusicCommentResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MusicCommentResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -823,10 +944,13 @@
         "tags": [
           "Comment"
         ],
+        "summary": "获取评论数。(完全没用，用id拿评论也能拿到评论数)",
         "parameters": [
           {
             "name": "hash",
             "in": "query",
+            "description": "音乐 hash。",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -834,6 +958,7 @@
           {
             "name": "special_id",
             "in": "query",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -841,7 +966,48 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "评论数字典。",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "pattern": "^-?(?:0|[1-9]\\d*)$",
+                    "type": [
+                      "integer",
+                      "string"
+                    ],
+                    "format": "int32"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "pattern": "^-?(?:0|[1-9]\\d*)$",
+                    "type": [
+                      "integer",
+                      "string"
+                    ],
+                    "format": "int32"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "pattern": "^-?(?:0|[1-9]\\d*)$",
+                    "type": [
+                      "integer",
+                      "string"
+                    ],
+                    "format": "int32"
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -851,10 +1017,12 @@
         "tags": [
           "Comment"
         ],
+        "summary": "楼层评论。",
         "parameters": [
           {
             "name": "special_id",
             "in": "query",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -862,6 +1030,8 @@
           {
             "name": "tid",
             "in": "query",
+            "description": "评论 id。",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -869,6 +1039,8 @@
           {
             "name": "mixsongid",
             "in": "query",
+            "description": "歌曲的 mixsongid。",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -884,6 +1056,7 @@
           {
             "name": "page",
             "in": "query",
+            "description": "页码。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -897,6 +1070,7 @@
           {
             "name": "pagesize",
             "in": "query",
+            "description": "每页数量。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -910,6 +1084,7 @@
           {
             "name": "show_classify",
             "in": "query",
+            "description": "是否返回分类列表。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -923,6 +1098,7 @@
           {
             "name": "show_hotword_list",
             "in": "query",
+            "description": "是否返回热词。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -936,6 +1112,7 @@
           {
             "name": "code",
             "in": "query",
+            "description": "附加 code。",
             "schema": {
               "type": "string"
             }
@@ -943,7 +1120,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "楼层评论数据。"
           }
         }
       }
@@ -953,10 +1130,13 @@
         "tags": [
           "Comment"
         ],
+        "summary": "歌曲评论 - 根据分类返回。",
         "parameters": [
           {
             "name": "mixsongid",
             "in": "query",
+            "description": "音乐 mixsongid。",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -964,6 +1144,7 @@
           {
             "name": "type_id",
             "in": "query",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -971,6 +1152,7 @@
           {
             "name": "page",
             "in": "query",
+            "description": "页码。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -984,6 +1166,7 @@
           {
             "name": "pagesize",
             "in": "query",
+            "description": "每页数量。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -997,6 +1180,7 @@
           {
             "name": "sort",
             "in": "query",
+            "description": "排序，1 为正序，2 为倒序。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -1010,7 +1194,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "按分类筛选的歌曲评论。"
           }
         }
       }
@@ -1020,10 +1204,13 @@
         "tags": [
           "Comment"
         ],
+        "summary": "歌曲评论 - 根据热词返回。",
         "parameters": [
           {
             "name": "mixsongid",
             "in": "query",
+            "description": "音乐 mixsongid。",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -1031,6 +1218,7 @@
           {
             "name": "hot_word",
             "in": "query",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -1038,6 +1226,7 @@
           {
             "name": "page",
             "in": "query",
+            "description": "页码。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -1051,6 +1240,7 @@
           {
             "name": "pagesize",
             "in": "query",
+            "description": "每页数量。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -1064,7 +1254,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "按热词筛选的歌曲评论。"
           }
         }
       }
@@ -1204,10 +1394,12 @@
         "tags": [
           "Discovery"
         ],
+        "summary": "AI 推荐。",
         "parameters": [
           {
             "name": "album_audio_id",
             "in": "query",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -1215,7 +1407,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "AI 推荐歌曲。"
           }
         }
       }
@@ -1225,9 +1417,10 @@
         "tags": [
           "Discovery"
         ],
+        "summary": "乐库。",
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "手机端乐库数据。"
           }
         }
       }
@@ -1237,9 +1430,10 @@
         "tags": [
           "Discovery"
         ],
+        "summary": "乐库 banner。",
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "乐库轮播图数据。"
           }
         }
       }
@@ -1249,9 +1443,10 @@
         "tags": [
           "Discovery"
         ],
+        "summary": "乐库电台。",
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "乐库电台数据。"
           }
         }
       }
@@ -1261,10 +1456,12 @@
         "tags": [
           "Discovery"
         ],
+        "summary": "新碟上架。",
         "parameters": [
           {
             "name": "page",
             "in": "query",
+            "description": "页数。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -1278,6 +1475,7 @@
           {
             "name": "pagesize",
             "in": "query",
+            "description": "每页页数。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -1291,7 +1489,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "新碟上架列表。"
           }
         }
       }
@@ -1301,6 +1499,7 @@
         "tags": [
           "Discovery"
         ],
+        "summary": "歌曲推荐。",
         "parameters": [
           {
             "name": "card_id",
@@ -1318,54 +1517,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/top/card/youth": {
-      "get": {
-        "tags": [
-          "Discovery"
-        ],
-        "parameters": [
-          {
-            "name": "card_id",
-            "in": "query",
-            "schema": {
-              "pattern": "^-?(?:0|[1-9]\\d*)$",
-              "type": [
-                "integer",
-                "string"
-              ],
-              "format": "int32",
-              "default": 3005
-            }
-          },
-          {
-            "name": "pagesize",
-            "in": "query",
-            "schema": {
-              "pattern": "^-?(?:0|[1-9]\\d*)$",
-              "type": [
-                "integer",
-                "string"
-              ],
-              "format": "int32",
-              "default": 30
-            }
-          },
-          {
-            "name": "tagid",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
+            "description": "歌曲推荐内容。"
           }
         }
       }
@@ -1375,9 +1527,10 @@
         "tags": [
           "Discovery"
         ],
+        "summary": "编辑精选。",
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "编辑精选数据。"
           }
         }
       }
@@ -1387,9 +1540,10 @@
         "tags": [
           "Discovery"
         ],
+        "summary": "banner。",
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "banner 轮播图数据。"
           }
         }
       }
@@ -1399,6 +1553,7 @@
         "tags": [
           "Discovery"
         ],
+        "summary": "刷刷。",
         "parameters": [
           {
             "name": "song_pool_id",
@@ -1416,6 +1571,7 @@
           {
             "name": "mode",
             "in": "query",
+            "description": "获取模式。",
             "schema": {
               "type": "string",
               "default": "normal"
@@ -1424,19 +1580,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
-    "/everyday/friend": {
-      "post": {
-        "tags": [
-          "Discovery"
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
+            "description": "刷刷推荐结果。"
           }
         }
       }
@@ -1446,10 +1590,12 @@
         "tags": [
           "Discovery"
         ],
+        "summary": "历史推荐。",
         "parameters": [
           {
             "name": "mode",
             "in": "query",
+            "description": "历史推荐模式。",
             "schema": {
               "type": "string",
               "default": "list"
@@ -1458,6 +1604,7 @@
           {
             "name": "platform",
             "in": "query",
+            "description": "设备类型。",
             "schema": {
               "type": "string",
               "default": "ios"
@@ -1473,6 +1620,7 @@
           {
             "name": "date",
             "in": "query",
+            "description": "日期。",
             "schema": {
               "type": "string"
             }
@@ -1480,7 +1628,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "历史推荐数据。"
           }
         }
       }
@@ -1606,9 +1754,10 @@
         "tags": [
           "Fm"
         ],
+        "summary": "电台 - 推荐。",
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "推荐电台列表。"
           }
         }
       }
@@ -1618,10 +1767,13 @@
         "tags": [
           "Fm"
         ],
+        "summary": "电台 - 音乐列表。",
         "parameters": [
           {
             "name": "fmid",
             "in": "query",
+            "description": "fmid，可以传多个。",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -1629,6 +1781,7 @@
           {
             "name": "type",
             "in": "query",
+            "description": "fmtype。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -1642,6 +1795,7 @@
           {
             "name": "offset",
             "in": "query",
+            "description": "fmoffset。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -1655,6 +1809,7 @@
           {
             "name": "size",
             "in": "query",
+            "description": "fmsize。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -1668,7 +1823,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "电台音乐列表。"
           }
         }
       }
@@ -1678,9 +1833,10 @@
         "tags": [
           "Fm"
         ],
+        "summary": "电台。（会返回所有电台数据，返回的json特别大，不建议使用）",
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "所有电台数据。"
           }
         }
       }
@@ -1690,10 +1846,13 @@
         "tags": [
           "Fm"
         ],
+        "summary": "电台 - 图片。",
         "parameters": [
           {
             "name": "fmid",
             "in": "query",
+            "description": "fmid，可以传多个。",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -1701,7 +1860,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "对应电台的图片。"
           }
         }
       }
@@ -1711,7 +1870,7 @@
         "tags": [
           "Login"
         ],
-        "summary": "手机验证码登录",
+        "summary": "登录。",
         "requestBody": {
           "description": "手机号和短信验证码。",
           "content": {
@@ -1762,7 +1921,7 @@
         "tags": [
           "Login"
         ],
-        "summary": "获取二维码 Key 和链接",
+        "summary": "二维码登录 - 二维码 key 生成接口。",
         "responses": {
           "200": {
             "description": "二维码 Key、登录链接和展示信息。",
@@ -1792,12 +1951,13 @@
         "tags": [
           "Login"
         ],
-        "summary": "检查二维码扫码状态",
+        "summary": "二维码登录 - 二维码检测扫码状态接口。",
         "parameters": [
           {
             "name": "key",
             "in": "query",
             "description": "二维码 Key",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -1832,7 +1992,7 @@
         "tags": [
           "Login"
         ],
-        "summary": "刷新 Token",
+        "summary": "刷新登录。",
         "responses": {
           "200": {
             "description": "刷新后的 Token 信息。",
@@ -1862,9 +2022,10 @@
         "tags": [
           "Login"
         ],
+        "summary": "退出登录。",
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "退出登录结果。"
           }
         }
       }
@@ -1874,10 +2035,12 @@
         "tags": [
           "Lyric"
         ],
+        "summary": "歌词搜索。",
         "parameters": [
           {
             "name": "hash",
             "in": "query",
+            "description": "歌曲 hash。",
             "schema": {
               "type": "string"
             }
@@ -1892,6 +2055,7 @@
           {
             "name": "keywords",
             "in": "query",
+            "description": "关键词。",
             "schema": {
               "type": "string"
             }
@@ -1899,6 +2063,7 @@
           {
             "name": "man",
             "in": "query",
+            "description": "是否返回多个歌词。",
             "schema": {
               "type": "string"
             }
@@ -1906,7 +2071,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "歌词搜索结果。"
           }
         }
       }
@@ -1916,12 +2081,13 @@
         "tags": [
           "Lyric"
         ],
-        "summary": "获取歌词内容。",
+        "summary": "获取歌词。",
         "parameters": [
           {
             "name": "id",
             "in": "query",
             "description": "歌词候选 ID。",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -1930,6 +2096,7 @@
             "name": "accesskey",
             "in": "query",
             "description": "歌词访问 Key。",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -1982,10 +2149,13 @@
         "tags": [
           "MediaCatalog"
         ],
+        "summary": "获取视频详情。",
         "parameters": [
           {
             "name": "id",
             "in": "query",
+            "description": "视频 ID。",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -1993,7 +2163,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "视频详情。"
           }
         }
       }
@@ -2003,10 +2173,13 @@
         "tags": [
           "MediaCatalog"
         ],
+        "summary": "获取视频 URL。",
         "parameters": [
           {
             "name": "hash",
             "in": "query",
+            "description": "视频 hash。",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -2014,7 +2187,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "视频 URL。"
           }
         }
       }
@@ -2024,10 +2197,12 @@
         "tags": [
           "MediaCatalog"
         ],
+        "summary": "听书 - 专辑详情。",
         "parameters": [
           {
             "name": "album_id",
             "in": "query",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -2035,7 +2210,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "听书专辑详情。"
           }
         }
       }
@@ -2045,10 +2220,12 @@
         "tags": [
           "MediaCatalog"
         ],
+        "summary": "听书 - 专辑音乐列表。",
         "parameters": [
           {
             "name": "album_id",
             "in": "query",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -2056,6 +2233,7 @@
           {
             "name": "page",
             "in": "query",
+            "description": "页码。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -2069,6 +2247,7 @@
           {
             "name": "pagesize",
             "in": "query",
+            "description": "每页页数。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -2082,7 +2261,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "听书专辑音乐列表。"
           }
         }
       }
@@ -2092,10 +2271,12 @@
         "tags": [
           "MediaCatalog"
         ],
+        "summary": "听书 - 每日推荐。",
         "parameters": [
           {
             "name": "page",
             "in": "query",
+            "description": "页数。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -2109,6 +2290,7 @@
           {
             "name": "pagesize",
             "in": "query",
+            "description": "每页页数。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -2122,7 +2304,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "听书每日推荐列表。"
           }
         }
       }
@@ -2132,9 +2314,10 @@
         "tags": [
           "MediaCatalog"
         ],
+        "summary": "听书 - 排行榜推荐。",
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "听书排行榜推荐。"
           }
         }
       }
@@ -2144,9 +2327,10 @@
         "tags": [
           "MediaCatalog"
         ],
+        "summary": "听书 - VIP 推荐。",
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "听书 VIP 推荐。"
           }
         }
       }
@@ -2156,9 +2340,10 @@
         "tags": [
           "MediaCatalog"
         ],
+        "summary": "听书 - 每周推荐。",
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "听书每周推荐。"
           }
         }
       }
@@ -2168,10 +2353,13 @@
         "tags": [
           "MediaCatalog"
         ],
+        "summary": "编辑精选数据。",
         "parameters": [
           {
             "name": "id",
             "in": "query",
+            "description": "ip id。",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -2179,6 +2367,7 @@
           {
             "name": "type",
             "in": "query",
+            "description": "数据类型。",
             "schema": {
               "type": "string",
               "default": "audios"
@@ -2187,6 +2376,7 @@
           {
             "name": "page",
             "in": "query",
+            "description": "页码。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -2200,6 +2390,7 @@
           {
             "name": "pagesize",
             "in": "query",
+            "description": "每页页数。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -2213,7 +2404,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "编辑精选对应数据。"
           }
         }
       }
@@ -2223,10 +2414,13 @@
         "tags": [
           "MediaCatalog"
         ],
+        "summary": "编辑精选详情。",
         "parameters": [
           {
             "name": "id",
             "in": "query",
+            "description": "ip id。",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -2234,7 +2428,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "编辑精选详情。"
           }
         }
       }
@@ -2244,10 +2438,13 @@
         "tags": [
           "MediaCatalog"
         ],
+        "summary": "编辑精选歌单。",
         "parameters": [
           {
             "name": "id",
             "in": "query",
+            "description": "ip id。",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -2255,6 +2452,7 @@
           {
             "name": "page",
             "in": "query",
+            "description": "页码。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -2268,6 +2466,7 @@
           {
             "name": "pagesize",
             "in": "query",
+            "description": "每页页数。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -2281,7 +2480,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "编辑精选歌单数据。"
           }
         }
       }
@@ -2291,9 +2490,10 @@
         "tags": [
           "MediaCatalog"
         ],
+        "summary": "编辑精选专区。",
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "编辑精选专区列表。"
           }
         }
       }
@@ -2303,10 +2503,13 @@
         "tags": [
           "MediaCatalog"
         ],
+        "summary": "编辑精选专区详情。",
         "parameters": [
           {
             "name": "id",
             "in": "query",
+            "description": "ip id。",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -2314,7 +2517,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "编辑精选专区详情。"
           }
         }
       }
@@ -2324,9 +2527,10 @@
         "tags": [
           "MediaCatalog"
         ],
+        "summary": "场景音乐列表。",
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "场景音乐列表。"
           }
         }
       }
@@ -2336,10 +2540,13 @@
         "tags": [
           "MediaCatalog"
         ],
+        "summary": "获取场景音乐音乐列表。",
         "parameters": [
           {
             "name": "id",
             "in": "query",
+            "description": "场景音乐 scene_id。",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -2347,6 +2554,7 @@
           {
             "name": "module_id",
             "in": "query",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -2354,6 +2562,8 @@
           {
             "name": "tag",
             "in": "query",
+            "description": "场景音乐 tag_id。",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -2361,6 +2571,7 @@
           {
             "name": "page",
             "in": "query",
+            "description": "页码。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -2374,6 +2585,7 @@
           {
             "name": "pagesize",
             "in": "query",
+            "description": "每页页数。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -2387,7 +2599,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "场景音乐音乐列表。"
           }
         }
       }
@@ -2397,10 +2609,12 @@
         "tags": [
           "MediaCatalog"
         ],
+        "summary": "获取场景音乐歌单列表。",
         "parameters": [
           {
             "name": "tag_id",
             "in": "query",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -2408,6 +2622,7 @@
           {
             "name": "page",
             "in": "query",
+            "description": "页码。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -2421,6 +2636,7 @@
           {
             "name": "pagesize",
             "in": "query",
+            "description": "每页页数。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -2434,7 +2650,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "场景音乐歌单列表。"
           }
         }
       }
@@ -2444,10 +2660,13 @@
         "tags": [
           "MediaCatalog"
         ],
+        "summary": "获取场景音乐讨论区。",
         "parameters": [
           {
             "name": "id",
             "in": "query",
+            "description": "场景音乐 scene_id。",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -2455,6 +2674,7 @@
           {
             "name": "page",
             "in": "query",
+            "description": "页码。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -2468,6 +2688,7 @@
           {
             "name": "pagesize",
             "in": "query",
+            "description": "每页页数。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -2481,6 +2702,7 @@
           {
             "name": "sort",
             "in": "query",
+            "description": "排序，rec、hot、new。",
             "schema": {
               "type": "string",
               "default": "rec"
@@ -2489,7 +2711,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "场景音乐讨论区。"
           }
         }
       }
@@ -2499,10 +2721,13 @@
         "tags": [
           "MediaCatalog"
         ],
+        "summary": "场景音乐详情。",
         "parameters": [
           {
             "name": "id",
             "in": "query",
+            "description": "场景音乐 scene_id。",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -2510,7 +2735,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "场景音乐详情。"
           }
         }
       }
@@ -2520,10 +2745,13 @@
         "tags": [
           "MediaCatalog"
         ],
+        "summary": "获取场景音乐模块 Tag。",
         "parameters": [
           {
             "name": "id",
             "in": "query",
+            "description": "场景音乐 scene_id。",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -2531,6 +2759,7 @@
           {
             "name": "module_id",
             "in": "query",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -2538,7 +2767,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "场景模块 Tag 信息。"
           }
         }
       }
@@ -2548,10 +2777,12 @@
         "tags": [
           "MediaCatalog"
         ],
+        "summary": "场景音乐资源列表。",
         "parameters": [
           {
             "name": "id",
             "in": "query",
+            "description": "场景音乐 scene_id。",
             "schema": {
               "type": "string"
             }
@@ -2559,6 +2790,7 @@
           {
             "name": "page",
             "in": "query",
+            "description": "页码。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -2572,6 +2804,7 @@
           {
             "name": "pagesize",
             "in": "query",
+            "description": "每页页数。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -2585,7 +2818,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "场景音乐资源列表。"
           }
         }
       }
@@ -2595,10 +2828,12 @@
         "tags": [
           "MediaCatalog"
         ],
+        "summary": "获取场景音乐视频列表。",
         "parameters": [
           {
             "name": "tag_id",
             "in": "query",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -2606,6 +2841,7 @@
           {
             "name": "page",
             "in": "query",
+            "description": "页码。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -2619,6 +2855,7 @@
           {
             "name": "pagesize",
             "in": "query",
+            "description": "每页页数。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -2632,7 +2869,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "场景音乐视频列表。"
           }
         }
       }
@@ -2642,10 +2879,13 @@
         "tags": [
           "MediaCatalog"
         ],
+        "summary": "获取主题音乐。",
         "parameters": [
           {
             "name": "ids",
             "in": "query",
+            "description": "主题音乐 id。",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -2653,7 +2893,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "主题音乐列表。"
           }
         }
       }
@@ -2663,9 +2903,10 @@
         "tags": [
           "MediaCatalog"
         ],
+        "summary": "主题歌单。",
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "主题歌单列表。"
           }
         }
       }
@@ -2675,10 +2916,13 @@
         "tags": [
           "MediaCatalog"
         ],
+        "summary": "获取主题音乐详情。",
         "parameters": [
           {
             "name": "id",
             "in": "query",
+            "description": "主题音乐 id。",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -2686,7 +2930,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "主题音乐详情。"
           }
         }
       }
@@ -2696,10 +2940,12 @@
         "tags": [
           "MediaCatalog"
         ],
+        "summary": "获取主题歌单所有歌曲。",
         "parameters": [
           {
             "name": "theme_id",
             "in": "query",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -2707,7 +2953,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "主题歌单歌曲列表。"
           }
         }
       }
@@ -2717,10 +2963,12 @@
         "tags": [
           "PlayList"
         ],
+        "summary": "推荐曲谱。",
         "parameters": [
           {
             "name": "position",
             "in": "query",
+            "description": "曲谱位置。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -2734,7 +2982,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "推荐曲谱列表。"
           }
         }
       }
@@ -2744,10 +2992,12 @@
         "tags": [
           "PlayList"
         ],
+        "summary": "曲谱合集详情。",
         "parameters": [
           {
             "name": "collection_id",
             "in": "query",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -2755,6 +3005,7 @@
           {
             "name": "page",
             "in": "query",
+            "description": "页码。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -2768,7 +3019,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "曲谱合集详情。"
           }
         }
       }
@@ -2778,10 +3029,13 @@
         "tags": [
           "PlayList"
         ],
+        "summary": "曲谱详情。",
         "parameters": [
           {
             "name": "id",
             "in": "query",
+            "description": "曲谱 ID。",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -2789,6 +3043,8 @@
           {
             "name": "source",
             "in": "query",
+            "description": "曲谱 source。",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -2796,7 +3052,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "曲谱详情。"
           }
         }
       }
@@ -2806,6 +3062,7 @@
         "tags": [
           "PlayList"
         ],
+        "summary": "曲谱合集。",
         "parameters": [
           {
             "name": "opern_type",
@@ -2823,7 +3080,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "曲谱合集列表。"
           }
         }
       }
@@ -2833,10 +3090,12 @@
         "tags": [
           "PlayList"
         ],
+        "summary": "歌曲曲谱。",
         "parameters": [
           {
             "name": "album_audio_id",
             "in": "query",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -2857,6 +3116,7 @@
           {
             "name": "page",
             "in": "query",
+            "description": "页码。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -2870,6 +3130,7 @@
           {
             "name": "pagesize",
             "in": "query",
+            "description": "每页页数。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -2883,7 +3144,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "歌曲曲谱列表。"
           }
         }
       }
@@ -2899,6 +3160,7 @@
             "name": "ids",
             "in": "query",
             "description": "歌单 ID。",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -2978,6 +3240,7 @@
             "name": "id",
             "in": "query",
             "description": "歌单 ID。",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -3044,6 +3307,7 @@
           {
             "name": "listid",
             "in": "query",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -3087,10 +3351,13 @@
         "tags": [
           "PlayList"
         ],
+        "summary": "相似歌单。",
         "parameters": [
           {
             "name": "ids",
             "in": "query",
+            "description": "歌单 global_collection_id。",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -3098,7 +3365,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "相似歌单列表。"
           }
         }
       }
@@ -3108,10 +3375,12 @@
         "tags": [
           "PlayList"
         ],
+        "summary": "音效歌单。",
         "parameters": [
           {
             "name": "page",
             "in": "query",
+            "description": "页数。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -3125,6 +3394,7 @@
           {
             "name": "pagesize",
             "in": "query",
+            "description": "每页页数。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -3138,7 +3408,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "音效歌单列表。"
           }
         }
       }
@@ -3148,11 +3418,13 @@
         "tags": [
           "PlayList"
         ],
-        "summary": "    收藏歌单\r\n<param name=\"name\">歌单名称。</param>\r\n<param name=\"list_create_gid\">歌单 ID。</param>",
+        "summary": "收藏歌单。",
         "parameters": [
           {
             "name": "name",
             "in": "query",
+            "description": "歌单名称。",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -3160,6 +3432,7 @@
           {
             "name": "list_create_gid",
             "in": "query",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -3167,7 +3440,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "收藏歌单结果。"
           }
         }
       }
@@ -3177,11 +3450,13 @@
         "tags": [
           "PlayList"
         ],
-        "summary": "    新建歌单\r\n<param name=\"name\">歌单名称。</param>\r\n<param name=\"type\">是否设为隐私，0：公开，1：隐私，仅支持创建歌单时传入</param>",
+        "summary": "新建歌单。",
         "parameters": [
           {
             "name": "name",
             "in": "query",
+            "description": "歌单名称。",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -3189,6 +3464,7 @@
           {
             "name": "type",
             "in": "query",
+            "description": "是否设为隐私，0：公开，1：隐私，仅支持创建歌单时传入。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -3202,7 +3478,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "新建歌单结果。"
           }
         }
       }
@@ -3212,11 +3488,13 @@
         "tags": [
           "PlayList"
         ],
-        "summary": "取消收藏 / 删除歌单",
+        "summary": "取消收藏 / 删除歌单。",
         "parameters": [
           {
             "name": "listid",
             "in": "query",
+            "description": "用户歌单 listid。",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -3224,7 +3502,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "删除歌单结果。"
           }
         }
       }
@@ -3291,6 +3569,7 @@
             "name": "listid",
             "in": "query",
             "description": "目标歌单 ID。",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -3299,6 +3578,7 @@
             "name": "fileids",
             "in": "query",
             "description": "歌曲 fileid，多个值用英文逗号分隔。",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -3379,10 +3659,13 @@
         "tags": [
           "Rank"
         ],
+        "summary": "排行榜信息。",
         "parameters": [
           {
             "name": "rankid",
             "in": "query",
+            "description": "排行榜 id。",
+            "required": true,
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -3420,6 +3703,7 @@
           {
             "name": "zone",
             "in": "query",
+            "description": "排行榜 zone。",
             "schema": {
               "type": "string"
             }
@@ -3427,7 +3711,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "排行榜信息。"
           }
         }
       }
@@ -3443,6 +3727,7 @@
             "name": "rankid",
             "in": "query",
             "description": "榜单 ID。",
+            "required": true,
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -3540,6 +3825,7 @@
         "tags": [
           "Report"
         ],
+        "summary": "提交听歌历史。(没什么用，历史记录存本地比较好)",
         "parameters": [
           {
             "name": "mxid",
@@ -3581,7 +3867,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "提交听歌历史结果。"
           }
         }
       }
@@ -3591,10 +3877,12 @@
         "tags": [
           "Report"
         ],
+        "summary": "获取继续播放信息（对应手机版首页显示继续播放入口）。",
         "parameters": [
           {
             "name": "pagesize",
             "in": "query",
+            "description": "每页页数。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -3608,7 +3896,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "继续播放信息。"
           }
         }
       }
@@ -3618,9 +3906,10 @@
         "tags": [
           "Report"
         ],
+        "summary": "累加听歌时长。",
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "听歌时长累加结果。"
           }
         }
       }
@@ -3630,11 +3919,13 @@
         "tags": [
           "Search"
         ],
-        "summary": "搜索歌曲或专辑等",
+        "summary": "搜索。",
         "parameters": [
           {
             "name": "keywords",
             "in": "query",
+            "description": "关键词。",
+            "required": true,
             "schema": {
               "type": "string",
               "default": ""
@@ -3643,6 +3934,7 @@
           {
             "name": "page",
             "in": "query",
+            "description": "页数。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -3656,6 +3948,7 @@
           {
             "name": "pagesize",
             "in": "query",
+            "description": "每页页数。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -3669,6 +3962,7 @@
           {
             "name": "type",
             "in": "query",
+            "description": "搜索类型。默认为单曲，special：歌单，lyric：歌词，song：单曲，album：专辑",
             "schema": {
               "type": "string",
               "default": "song"
@@ -3677,7 +3971,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "搜索结果。"
           }
         }
       }
@@ -3693,6 +3987,7 @@
             "name": "keywords",
             "in": "query",
             "description": "搜索关键词。",
+            "required": true,
             "schema": {
               "type": "string",
               "default": ""
@@ -3757,6 +4052,7 @@
             "name": "keywords",
             "in": "query",
             "description": "搜索关键词。",
+            "required": true,
             "schema": {
               "type": "string",
               "default": ""
@@ -3815,7 +4111,7 @@
         "tags": [
           "Search"
         ],
-        "summary": "获取热搜",
+        "summary": "热搜列表。",
         "responses": {
           "200": {
             "description": "热搜关键词和热度信息。",
@@ -3845,9 +4141,10 @@
         "tags": [
           "Search"
         ],
+        "summary": "默认搜索关键词。",
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "默认搜索关键词。"
           }
         }
       }
@@ -3857,10 +4154,13 @@
         "tags": [
           "Search"
         ],
+        "summary": "搜索建议。",
         "parameters": [
           {
             "name": "keywords",
             "in": "query",
+            "description": "搜索关键词。",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -3868,6 +4168,7 @@
           {
             "name": "albumTipCount",
             "in": "query",
+            "description": "专辑返回数量。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -3881,6 +4182,7 @@
           {
             "name": "correctTipCount",
             "in": "query",
+            "description": "纠正提示数量。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -3894,6 +4196,7 @@
           {
             "name": "mvTipCount",
             "in": "query",
+            "description": "MV 返回数量。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -3907,6 +4210,7 @@
           {
             "name": "musicTipCount",
             "in": "query",
+            "description": "音乐返回数量。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -3920,7 +4224,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "搜索建议结果。"
           }
         }
       }
@@ -3930,10 +4234,13 @@
         "tags": [
           "Search"
         ],
+        "summary": "综合搜索。",
         "parameters": [
           {
             "name": "keyword",
             "in": "query",
+            "description": "搜索关键词。",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -3941,7 +4248,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "综合搜索结果。"
           }
         }
       }
@@ -3951,10 +4258,13 @@
         "tags": [
           "Search"
         ],
+        "summary": "综合搜索。",
         "parameters": [
           {
             "name": "keywords",
             "in": "query",
+            "description": "关键词。",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -3962,6 +4272,7 @@
           {
             "name": "page",
             "in": "query",
+            "description": "页数。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -3975,6 +4286,7 @@
           {
             "name": "pagesize",
             "in": "query",
+            "description": "每页页数。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -3988,7 +4300,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "综合搜索结果。"
           }
         }
       }
@@ -3998,10 +4310,13 @@
         "tags": [
           "Song"
         ],
+        "summary": "获取音乐相关信息。",
         "parameters": [
           {
             "name": "hash",
             "in": "query",
+            "description": "歌曲 hash，可以传多个，每个以逗号分开。",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -4009,7 +4324,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "音乐相关信息。"
           }
         }
       }
@@ -4019,10 +4334,12 @@
         "tags": [
           "Song"
         ],
+        "summary": "获取更多音乐版本。",
         "parameters": [
           {
             "name": "album_audio_id",
             "in": "query",
+            "required": true,
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -4035,6 +4352,7 @@
           {
             "name": "page",
             "in": "query",
+            "description": "页码。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -4048,6 +4366,7 @@
           {
             "name": "pagesize",
             "in": "query",
+            "description": "每页页数。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -4061,6 +4380,7 @@
           {
             "name": "sort",
             "in": "query",
+            "description": "排序，支持 all、hot、new。",
             "schema": {
               "type": "string",
               "default": "all"
@@ -4069,6 +4389,7 @@
           {
             "name": "type",
             "in": "query",
+            "description": "分类。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -4108,7 +4429,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "更多版本音乐信息。"
           }
         }
       }
@@ -4118,10 +4439,22 @@
         "tags": [
           "Song"
         ],
+        "summary": "获取音乐伴奏信息。",
         "parameters": [
           {
             "name": "hash",
             "in": "query",
+            "description": "音乐 hash。",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "fileName",
+            "in": "query",
+            "description": "音乐 fileName。",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -4129,27 +4462,21 @@
           {
             "name": "mixId",
             "in": "query",
+            "description": "音乐的 mixsongid/album_audio_id。",
+            "required": true,
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
                 "integer",
                 "string"
               ],
-              "format": "int64",
-              "default": 0
-            }
-          },
-          {
-            "name": "fileName",
-            "in": "query",
-            "schema": {
-              "type": "string"
+              "format": "int64"
             }
           }
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "最佳伴奏信息。"
           }
         }
       }
@@ -4159,10 +4486,13 @@
         "tags": [
           "Song"
         ],
+        "summary": "获取音乐 K 歌数量。",
         "parameters": [
           {
             "name": "songId",
             "in": "query",
+            "description": "音乐 songid。",
+            "required": true,
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -4175,6 +4505,8 @@
           {
             "name": "songHash",
             "in": "query",
+            "description": "音乐 hash。",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -4182,6 +4514,8 @@
           {
             "name": "singerName",
             "in": "query",
+            "description": "歌手名称，多个以 `、` 隔开。",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -4189,7 +4523,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "音乐 K 歌数量。"
           }
         }
       }
@@ -4199,10 +4533,13 @@
         "tags": [
           "Song"
         ],
+        "summary": "获取歌曲高潮部分。",
         "parameters": [
           {
             "name": "hash",
             "in": "query",
+            "description": "音乐 hash，可以传多个，以逗号分割。",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -4210,7 +4547,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "歌曲高潮时间信息。"
           }
         }
       }
@@ -4220,10 +4557,12 @@
         "tags": [
           "Song"
         ],
+        "summary": "歌曲详情 - 歌曲成绩单。",
         "parameters": [
           {
             "name": "album_audio_id",
             "in": "query",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -4231,7 +4570,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "歌曲成绩单信息。"
           }
         }
       }
@@ -4241,10 +4580,12 @@
         "tags": [
           "Song"
         ],
+        "summary": "歌曲详情 - 歌曲成绩单详情。",
         "parameters": [
           {
             "name": "album_audio_id",
             "in": "query",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -4252,6 +4593,7 @@
           {
             "name": "page",
             "in": "query",
+            "description": "页数。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -4265,6 +4607,7 @@
           {
             "name": "pagesize",
             "in": "query",
+            "description": "每页页数。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -4278,7 +4621,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "更详细的歌曲成绩单信息。"
           }
         }
       }
@@ -4288,10 +4631,12 @@
         "tags": [
           "Song"
         ],
+        "summary": "获取歌曲 MV。",
         "parameters": [
           {
             "name": "album_audio_id",
             "in": "query",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -4299,6 +4644,7 @@
           {
             "name": "fields",
             "in": "query",
+            "description": "支持的值有：mkv,tags,h264,h265,authors",
             "schema": {
               "type": "string"
             }
@@ -4306,7 +4652,24 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "歌曲 相对应的 mv。",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/AudioMvResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AudioMvResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AudioMvResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -4316,10 +4679,12 @@
         "tags": [
           "Song"
         ],
+        "summary": "获取音乐专辑/歌手信息。",
         "parameters": [
           {
             "name": "album_audio_id",
             "in": "query",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -4327,6 +4692,7 @@
           {
             "name": "fields",
             "in": "query",
+            "description": "可选字段集合。",
             "schema": {
               "type": "string",
               "default": "base"
@@ -4335,7 +4701,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "音乐专辑/歌手信息。"
           }
         }
       }
@@ -4345,10 +4711,13 @@
         "tags": [
           "Song"
         ],
+        "summary": "获取音乐详情。",
         "parameters": [
           {
             "name": "hash",
             "in": "query",
+            "description": "歌曲 hash，可以传多个，每个以逗号分开。",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -4363,7 +4732,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "音乐详情。"
           }
         }
       }
@@ -4373,10 +4742,13 @@
         "tags": [
           "Song"
         ],
+        "summary": "获取歌手和专辑图片。",
         "parameters": [
           {
             "name": "hash",
             "in": "query",
+            "description": "歌曲 hash，可以传多个，每个以逗号分开。",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -4398,6 +4770,7 @@
           {
             "name": "count",
             "in": "query",
+            "description": "最多返回多少张图片。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -4411,7 +4784,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "歌手和专辑图片信息。"
           }
         }
       }
@@ -4427,6 +4800,7 @@
             "name": "hash",
             "in": "query",
             "description": "歌曲 Hash。",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -4491,42 +4865,6 @@
         }
       }
     },
-    "/song/url/new": {
-      "get": {
-        "tags": [
-          "Song"
-        ],
-        "parameters": [
-          {
-            "name": "hash",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "album_audio_id",
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "free_part",
-            "in": "query",
-            "schema": {
-              "type": "boolean",
-              "default": false
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        }
-      }
-    },
     "/song/url": {
       "get": {
         "tags": [
@@ -4538,6 +4876,7 @@
             "name": "hash",
             "in": "query",
             "description": "歌曲 Hash。",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -4723,9 +5062,10 @@
         "tags": [
           "User"
         ],
+        "summary": "获取用户最近听歌历史。",
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "近期听歌历史记录。"
           }
         }
       }
@@ -4735,9 +5075,10 @@
         "tags": [
           "User"
         ],
+        "summary": "获取用户听歌历史排行。",
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "用户听歌历史排行。"
           }
         }
       }
@@ -4747,9 +5088,10 @@
         "tags": [
           "User"
         ],
+        "summary": "获取用户关注歌手。",
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "用户关注的歌手或用户列表。"
           }
         }
       }
@@ -4759,10 +5101,12 @@
         "tags": [
           "User"
         ],
+        "summary": "获取用户云盘。",
         "parameters": [
           {
             "name": "page",
             "in": "query",
+            "description": "页数。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -4776,6 +5120,7 @@
           {
             "name": "pagesize",
             "in": "query",
+            "description": "每页页数。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -4789,7 +5134,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "用户云盘音乐列表。"
           }
         }
       }
@@ -4799,10 +5144,13 @@
         "tags": [
           "User"
         ],
+        "summary": "获取用户云盘音乐 URL。",
         "parameters": [
           {
             "name": "hash",
             "in": "query",
+            "description": "音乐 hash。",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -4824,6 +5172,7 @@
           {
             "name": "name",
             "in": "query",
+            "description": "云盘音乐名称。",
             "schema": {
               "type": "string"
             }
@@ -4831,7 +5180,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "用户云盘音乐 URL。"
           }
         }
       }
@@ -4841,10 +5190,12 @@
         "tags": [
           "User"
         ],
+        "summary": "获取关注歌手消息。",
         "parameters": [
           {
             "name": "id",
             "in": "query",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -4852,6 +5203,7 @@
           {
             "name": "pagesize",
             "in": "query",
+            "description": "每页页数。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -4865,7 +5217,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "关注歌手或用户消息。"
           }
         }
       }
@@ -4875,10 +5227,12 @@
         "tags": [
           "User"
         ],
+        "summary": "获取用户收藏的视频。",
         "parameters": [
           {
             "name": "page",
             "in": "query",
+            "description": "页数。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -4892,6 +5246,7 @@
           {
             "name": "pagesize",
             "in": "query",
+            "description": "每页页数。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -4905,7 +5260,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "用户收藏的视频列表。"
           }
         }
       }
@@ -4915,10 +5270,12 @@
         "tags": [
           "User"
         ],
+        "summary": "获取用户喜欢的视频。",
         "parameters": [
           {
             "name": "pagesize",
             "in": "query",
+            "description": "每页页数。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -4932,7 +5289,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "用户喜欢的视频列表。"
           }
         }
       }
@@ -4942,10 +5299,13 @@
         "tags": [
           "User"
         ],
+        "summary": "歌曲收藏数。",
         "parameters": [
           {
             "name": "mixsongids",
             "in": "query",
+            "description": "音乐 mixsongid，多个以逗号分隔。",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -4953,7 +5313,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "歌曲收藏数。"
           }
         }
       }
@@ -4963,9 +5323,10 @@
         "tags": [
           "User"
         ],
+        "summary": "获取服务器时间。",
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "服务器时间。"
           }
         }
       }
@@ -4975,10 +5336,12 @@
         "tags": [
           "Youth"
         ],
+        "summary": "频道 - 获取用户所有频道。",
         "parameters": [
           {
             "name": "page",
             "in": "query",
+            "description": "页数。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -4992,6 +5355,7 @@
           {
             "name": "pagesize",
             "in": "query",
+            "description": "每页页数。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -5005,7 +5369,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "用户所有订阅的频道。"
           }
         }
       }
@@ -5015,10 +5379,12 @@
         "tags": [
           "Youth"
         ],
+        "summary": "频道 - 频道安利。",
         "parameters": [
           {
             "name": "global_collection_id",
             "in": "query",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -5026,7 +5392,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "频道安利信息。"
           }
         }
       }
@@ -5036,10 +5402,12 @@
         "tags": [
           "Youth"
         ],
+        "summary": "频道 - 详情。",
         "parameters": [
           {
             "name": "global_collection_id",
             "in": "query",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -5047,7 +5415,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "频道详情。"
           }
         }
       }
@@ -5057,10 +5425,12 @@
         "tags": [
           "Youth"
         ],
+        "summary": "频道 - 相似频道。",
         "parameters": [
           {
             "name": "channel_id",
             "in": "query",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -5068,7 +5438,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "相似频道列表。"
           }
         }
       }
@@ -5078,10 +5448,12 @@
         "tags": [
           "Youth"
         ],
+        "summary": "频道 - 音乐故事。",
         "parameters": [
           {
             "name": "global_collection_id",
             "in": "query",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -5089,6 +5461,7 @@
           {
             "name": "page",
             "in": "query",
+            "description": "页数。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -5102,6 +5475,7 @@
           {
             "name": "pagesize",
             "in": "query",
+            "description": "每页页数。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -5115,7 +5489,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "音乐故事列表。"
           }
         }
       }
@@ -5125,10 +5499,12 @@
         "tags": [
           "Youth"
         ],
+        "summary": "频道 - 音乐故事详情。",
         "parameters": [
           {
             "name": "global_collection_id",
             "in": "query",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -5136,6 +5512,8 @@
           {
             "name": "fileid",
             "in": "query",
+            "description": "音乐故事 fileid。",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -5143,7 +5521,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "音乐故事详情。"
           }
         }
       }
@@ -5153,10 +5531,12 @@
         "tags": [
           "Youth"
         ],
+        "summary": "频道 - 订阅。",
         "parameters": [
           {
             "name": "global_collection_id",
             "in": "query",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -5164,6 +5544,7 @@
           {
             "name": "t",
             "in": "query",
+            "description": "1 为订阅，0 为取消订阅。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -5177,7 +5558,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "频道订阅结果。"
           }
         }
       }
@@ -5187,9 +5568,10 @@
         "tags": [
           "Youth"
         ],
+        "summary": "动态。",
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "动态内容。"
           }
         }
       }
@@ -5199,9 +5581,10 @@
         "tags": [
           "Youth"
         ],
+        "summary": "动态 - 最常访问。",
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "经常访问的频道和用户。"
           }
         }
       }
@@ -5250,10 +5633,13 @@
         "tags": [
           "Youth"
         ],
+        "summary": "获取用户公开的音乐。",
         "parameters": [
           {
             "name": "userid",
             "in": "query",
+            "description": "用户 id。",
+            "required": true,
             "schema": {
               "type": "string"
             }
@@ -5261,6 +5647,7 @@
           {
             "name": "page",
             "in": "query",
+            "description": "页数。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -5274,6 +5661,7 @@
           {
             "name": "pagesize",
             "in": "query",
+            "description": "每页页数。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -5287,6 +5675,7 @@
           {
             "name": "type",
             "in": "query",
+            "description": "公开音乐类型。",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -5300,7 +5689,7 @@
         ],
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "用户公开的音乐列表。"
           }
         }
       }
@@ -5310,9 +5699,10 @@
         "tags": [
           "Youth"
         ],
+        "summary": "领取 VIP。",
         "responses": {
           "200": {
-            "description": "OK"
+            "description": "领取 VIP 上报结果。"
           }
         }
       }
@@ -5651,6 +6041,171 @@
         },
         "description": "专辑中的单首歌曲"
       },
+      "ArtistVideoExtra": {
+        "type": "object",
+        "properties": {
+          "page_total": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "ArtistVideoItem": {
+        "type": "object",
+        "properties": {
+          "video_id": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "video_name": {
+            "type": "string"
+          },
+          "author_name": {
+            "type": "string"
+          },
+          "cover": {
+            "type": "string"
+          },
+          "hdpic": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "高清封面图，自动替换 {size} 为 400"
+          },
+          "publish_date": {
+            "type": "string"
+          },
+          "timelength": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "视频时长（毫秒）",
+            "format": "int64"
+          },
+          "audio_hash": {
+            "type": "string"
+          },
+          "album_audio_id": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "history_heat": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "heat": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "topic": {
+            "type": "string"
+          },
+          "remark": {
+            "type": "string"
+          },
+          "intro": {
+            "type": "string"
+          },
+          "type": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "视频类型",
+            "format": "int32"
+          },
+          "is_short": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "h264": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/VideoH264Info"
+              }
+            ]
+          }
+        }
+      },
+      "ArtistVideoResponse": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "extra": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ArtistVideoExtra"
+              }
+            ]
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ArtistVideoItem"
+            }
+          },
+          "status": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "error_code": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        },
+        "description": "歌手 MV"
+      },
       "AudioImageAuthor": {
         "type": "object",
         "properties": {
@@ -5792,6 +6347,249 @@
         },
         "description": "歌曲作者写真，对应 /images/audio。"
       },
+      "AudioMvItem": {
+        "type": "object",
+        "properties": {
+          "is_recommend": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "user_id": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "hot": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "hit": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "user_name": {
+            "type": "string"
+          },
+          "songid": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "thumb": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "MV 缩略图"
+          },
+          "desc": {
+            "type": "string"
+          },
+          "__status": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "内部状态字段",
+            "format": "int32"
+          },
+          "singer": {
+            "type": "string"
+          },
+          "other_desc": {
+            "type": "string"
+          },
+          "hdpic": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "MV 高清封面图"
+          },
+          "is_ugc": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "have_mp4": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "audio_id": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "album_audio_id": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "is_publish": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "download_total": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "collection_total": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "is_short": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "remark": {
+            "type": "string"
+          },
+          "video_id": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "user_avatar": {
+            "type": "string"
+          },
+          "music_trac": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "mv_name": {
+            "type": "string"
+          },
+          "duration": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "时长（毫秒）",
+            "format": "int64"
+          },
+          "topic": {
+            "type": "string"
+          },
+          "type": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "is_other": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "publish_time": {
+            "type": "string"
+          },
+          "play_times": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          }
+        },
+        "description": "单条 MV 详情"
+      },
+      "AudioMvResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "type": "array",
+              "items": {
+                "$ref": "#/components/schemas/AudioMvItem"
+              }
+            },
+            "description": "数据体是一个二维数组"
+          },
+          "status": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "error_code": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        },
+        "description": "歌曲相关 MV 响应"
+      },
       "BusiVipInfo": {
         "type": "object",
         "properties": {
@@ -5823,6 +6621,223 @@
           "vip_clearday": {
             "type": "string",
             "description": "清除时间"
+          }
+        }
+      },
+      "CommentClassifyItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "label": {
+            "type": "string"
+          },
+          "icon": {
+            "type": "string"
+          },
+          "cnt": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "CommentConfig": {
+        "type": "object",
+        "properties": {
+          "emptyTip": {
+            "type": "string"
+          },
+          "input_hint": {
+            "type": "string"
+          }
+        }
+      },
+      "CommentHotWord": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string"
+          },
+          "count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "CommentImage": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string"
+          },
+          "width": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "height": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "CommentLikeInfo": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "haslike": {
+            "type": "boolean"
+          },
+          "likenum": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "CommentSongScore": {
+        "type": "object",
+        "properties": {
+          "score_user_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "song_score": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": [
+              "number",
+              "string"
+            ],
+            "format": "double"
+          }
+        }
+      },
+      "CommentTag": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "CommentTailInfo": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "CommentUserDetail": {
+        "type": "object",
+        "properties": {
+          "medal_type": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "medal_roll_word": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "word_v3": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "pendant_name": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "pendant_url": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "CommentVipInfo": {
+        "type": "object",
+        "properties": {
+          "vip_type": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "m_type": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "user_type": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
           }
         }
       },
@@ -5911,8 +6926,13 @@
             "format": "int64"
           },
           "mixsongid": {
-            "type": "string",
-            "description": "混合 ID (用于歌词搜索等)"
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "混合 ID",
+            "format": "int32"
           },
           "sizable_cover": {
             "type": [
@@ -6100,6 +7120,249 @@
             "type": "string"
           }
         }
+      },
+      "MusicCommentItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "content": {
+            "type": "string"
+          },
+          "addtime": {
+            "type": "string"
+          },
+          "reply_num": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "user_id": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "user_name": {
+            "type": "string"
+          },
+          "user_pic": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "user_sex": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "like": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/CommentLikeInfo"
+              }
+            ]
+          },
+          "images": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/CommentImage"
+            }
+          },
+          "location": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "hash": {
+            "type": "string"
+          },
+          "score": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "vipinfo": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/CommentVipInfo"
+              }
+            ]
+          },
+          "udetail": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/CommentUserDetail"
+              }
+            ]
+          },
+          "machine_tail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "tail": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/CommentTailInfo"
+              }
+            ]
+          }
+        },
+        "description": "单条评论内容"
+      },
+      "MusicCommentResponse": {
+        "type": "object",
+        "properties": {
+          "msg": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "childrenid": {
+            "type": "string"
+          },
+          "count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "combine_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "current_page": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "maxPage": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "list": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MusicCommentItem"
+            }
+          },
+          "hot_word_list": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/CommentHotWord"
+            }
+          },
+          "classify_list": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/CommentClassifyItem"
+            }
+          },
+          "tag": {
+            "type": [
+              "null",
+              "array"
+            ],
+            "items": {
+              "$ref": "#/components/schemas/CommentTag"
+            }
+          },
+          "config": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/CommentConfig"
+              }
+            ]
+          },
+          "song_score": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/CommentSongScore"
+              }
+            ]
+          },
+          "status": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "error_code": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        },
+        "description": "音乐评论列表响应数据"
       },
       "OneDayVipModel": {
         "type": "object",
@@ -6422,6 +7685,15 @@
               "string"
             ],
             "description": "封面图地址。"
+          },
+          "mixsongid": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "混合歌曲 ID。",
+            "format": "int32"
           },
           "status": {
             "pattern": "^-?(?:0|[1-9]\\d*)$",
@@ -7600,6 +8872,15 @@
             "description": "专辑 ID。",
             "format": "int64"
           },
+          "album_audio_id": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "专辑歌曲 ID(等同于mixsongid) 。",
+            "format": "int64"
+          },
           "album_name": {
             "type": "string",
             "description": "专辑名称。"
@@ -7809,7 +9090,7 @@
               "integer",
               "string"
             ],
-            "description": "媒体库 ID。",
+            "description": "专辑 ID。",
             "format": "int64"
           },
           "list_create_username": {
@@ -7947,6 +9228,107 @@
           }
         },
         "description": "用户 VIP 详情响应"
+      },
+      "VideoH264Info": {
+        "type": "object",
+        "properties": {
+          "ld_hash": {
+            "type": "string"
+          },
+          "ld_filesize": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "ld_bitrate": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "sd_hash": {
+            "type": "string"
+          },
+          "sd_filesize": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "sd_bitrate": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "qhd_hash": {
+            "type": "string"
+          },
+          "qhd_filesize": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "qhd_bitrate": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "hd_hash": {
+            "type": "string"
+          },
+          "hd_filesize": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "hd_bitrate": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "fhd_hash": {
+            "type": "string"
+          },
+          "fhd_filesize": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "fhd_bitrate": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        },
+        "description": "H264 各清晰度视频哈希与信息"
       },
       "VipFutureDuration": {
         "type": "object",

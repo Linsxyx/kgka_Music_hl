@@ -2,14 +2,16 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 
+import '../../controllers/auth_controller.dart';
 import '../../controllers/player_controller.dart';
 import '../pages/player_page.dart';
 import 'artwork.dart';
 
 class MiniPlayer extends StatelessWidget {
-  const MiniPlayer({super.key, required this.player});
+  const MiniPlayer({super.key, required this.player, required this.auth});
 
   final PlayerController player;
+  final AuthController auth;
 
   @override
   Widget build(BuildContext context) {
@@ -54,7 +56,7 @@ class MiniPlayer extends StatelessWidget {
                 child: InkWell(
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute(
-                      builder: (_) => PlayerPage(player: player),
+                      builder: (_) => PlayerPage(player: player, auth: auth),
                     ),
                   ),
                   child: SizedBox(
@@ -134,7 +136,7 @@ class MiniPlayer extends StatelessWidget {
                                             Navigator.of(context).push(
                                               MaterialPageRoute(
                                                 builder: (_) =>
-                                                    PlayerPage(player: player),
+                                                    PlayerPage(player: player, auth: auth),
                                               ),
                                             ),
                                         icon: Icon(

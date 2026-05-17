@@ -74,9 +74,6 @@ class PlaylistSummary {
   bool get isLikedPlaylist => isDefault == 2 || title.trim() == '我喜欢';
 
   bool get isCreatedPlaylist {
-    if (isLikedPlaylist) {
-      return false;
-    }
     if (type == 0) {
       return true;
     }

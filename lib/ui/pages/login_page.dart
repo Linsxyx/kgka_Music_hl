@@ -1,0 +1,637 @@
+import 'dart:async';
+import 'dart:math' as math;
+
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
+import '../../controllers/auth_controller.dart';
+
+class LoginPage extends StatefulWidget {
+  const LoginPage({super.key, required this.auth});
+
+  final AuthController auth;
+
+  @override
+  State<LoginPage> createState() => _LoginPageState();
+}
+
+class _LoginPageState extends State<LoginPage> {
+  final _mobileController = TextEditingController();
+  final _codeController = TextEditingController();
+  final _mobileFocus = FocusNode();
+  final _codeFocus = FocusNode();
+
+  Timer? _codeTimer;
+  String? _localError;
+  int _codeSeconds = 0;
+
+  @override
+  void dispose() {
+    _codeTimer?.cancel();
+    _mobileController.dispose();
+    _codeController.dispose();
+    _mobileFocus.dispose();
+    _codeFocus.dispose();
+    super.dispose();
+  }
+
+  Future<void> _sendCode() async {
+    if (_codeSeconds > 0) return;
+
+    final mobile = _mobileController.text.trim();
+    if (mobile.isEmpty) {
+      setState(() => _localError = '请输入手机号');
+      _mobileFocus.requestFocus();
+      return;
+    }
+
+    setState(() => _localError = null);
+    await widget.auth.sendCode(mobile);
+    if (!mounted) return;
+
+    if (widget.auth.errorMessage == null) {
+      _startCodeCountdown();
+      _codeFocus.requestFocus();
+    }
+  }
+
+  void _startCodeCountdown() {
+    _codeTimer?.cancel();
+    setState(() => _codeSeconds = 60);
+    _codeTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+
+      if (_codeSeconds <= 1) {
+        timer.cancel();
+        setState(() => _codeSeconds = 0);
+        return;
+      }
+
+      setState(() => _codeSeconds--);
+    });
+  }
+
+  Future<void> _login() async {
+    final mobile = _mobileController.text.trim();
+    final code = _codeController.text.trim();
+    if (mobile.isEmpty) {
+      setState(() => _localError = '请输入手机号');
+      _mobileFocus.requestFocus();
+      return;
+    }
+    if (code.isEmpty) {
+      setState(() => _localError = '请输入验证码');
+      _codeFocus.requestFocus();
+      return;
+    }
+
+    setState(() => _localError = null);
+    await widget.auth.login(mobile, code);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colorScheme = Theme.of(context).colorScheme;
+    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
+
+    return Scaffold(
+      resizeToAvoidBottomInset: true,
+      body: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: isDark
+                ? const [Color(0xFF10233A), Color(0xFF06070A)]
+                : const [Color(0xFFDCEEFF), Color(0xFFF7FBFF), Colors.white],
+            stops: isDark ? const [0, 1] : const [0, .58, 1],
+          ),
+        ),
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: CustomPaint(
+                painter: _LoginBackgroundPainter(
+                  primary: colorScheme.primary,
+                  secondary: colorScheme.secondary,
+                  outline: colorScheme.outlineVariant,
+                  isDark: isDark,
+                ),
+              ),
+            ),
+            SafeArea(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  return SingleChildScrollView(
+                    padding: EdgeInsets.fromLTRB(
+                      22,
+                      34,
+                      22,
+                      keyboardInset + 24,
+                    ),
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(
+                        minHeight: constraints.maxHeight - 58,
+                      ),
+                      child: Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 440),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              _LoginHeader(colorScheme: colorScheme),
+                              const SizedBox(height: 28),
+                              _LoginForm(
+                                auth: widget.auth,
+                                codeController: _codeController,
+                                codeFocus: _codeFocus,
+                                codeSeconds: _codeSeconds,
+                                errorText:
+                                    _localError ?? widget.auth.errorMessage,
+                                mobileController: _mobileController,
+                                mobileFocus: _mobileFocus,
+                                onLogin: _login,
+                                onSendCode: _sendCode,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LoginHeader extends StatelessWidget {
+  const _LoginHeader({required this.colorScheme});
+
+  final ColorScheme colorScheme;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'KA Music',
+          style: textTheme.headlineMedium?.copyWith(
+            color: colorScheme.onSurface,
+            fontWeight: FontWeight.w900,
+            height: 1.08,
+          ),
+        ),
+        const SizedBox(height: 10),
+        Text(
+          '请先登录后继续使用',
+          style: textTheme.bodyLarge?.copyWith(
+            color: colorScheme.onSurfaceVariant,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _LoginForm extends StatelessWidget {
+  const _LoginForm({
+    required this.auth,
+    required this.codeController,
+    required this.codeFocus,
+    required this.codeSeconds,
+    required this.errorText,
+    required this.mobileController,
+    required this.mobileFocus,
+    required this.onLogin,
+    required this.onSendCode,
+  });
+
+  final AuthController auth;
+  final TextEditingController codeController;
+  final FocusNode codeFocus;
+  final int codeSeconds;
+  final String? errorText;
+  final TextEditingController mobileController;
+  final FocusNode mobileFocus;
+  final VoidCallback onLogin;
+  final VoidCallback onSendCode;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final isBusy = auth.isLoading;
+    final canSendCode = !isBusy && codeSeconds == 0;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: colorScheme.surface.withValues(alpha: .92),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: colorScheme.outlineVariant),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: .06),
+            blurRadius: 24,
+            offset: const Offset(0, 14),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(18, 20, 18, 18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '手机号登录',
+              style: textTheme.titleLarge?.copyWith(
+                color: colorScheme.onSurface,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 18),
+            _LoginTextField(
+              controller: mobileController,
+              focusNode: mobileFocus,
+              icon: Icons.phone_iphone_rounded,
+              hintText: '手机号',
+              keyboardType: TextInputType.phone,
+              textInputAction: TextInputAction.next,
+              enabled: !isBusy,
+              maxLength: 11,
+              autofillHints: const [AutofillHints.telephoneNumber],
+              onSubmitted: (_) => codeFocus.requestFocus(),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: _LoginTextField(
+                    controller: codeController,
+                    focusNode: codeFocus,
+                    icon: Icons.password_rounded,
+                    hintText: '验证码',
+                    keyboardType: TextInputType.number,
+                    textInputAction: TextInputAction.done,
+                    enabled: !isBusy,
+                    maxLength: 8,
+                    autofillHints: const [AutofillHints.oneTimeCode],
+                    onSubmitted: (_) => onLogin(),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                _CodeButton(
+                  enabled: canSendCode,
+                  label: codeSeconds > 0 ? '${codeSeconds}s' : '获取验证码',
+                  onTap: onSendCode,
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+            _PrimaryLoginButton(isLoading: isBusy, onTap: onLogin),
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 180),
+              child: errorText == null
+                  ? const SizedBox.shrink()
+                  : Padding(
+                      key: ValueKey(errorText),
+                      padding: const EdgeInsets.only(top: 14),
+                      child: Text(
+                        errorText!,
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                        style: textTheme.bodySmall?.copyWith(
+                          color: colorScheme.error,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LoginTextField extends StatelessWidget {
+  const _LoginTextField({
+    required this.controller,
+    required this.focusNode,
+    required this.icon,
+    required this.hintText,
+    required this.keyboardType,
+    required this.textInputAction,
+    required this.enabled,
+    required this.maxLength,
+    required this.autofillHints,
+    required this.onSubmitted,
+  });
+
+  final TextEditingController controller;
+  final FocusNode focusNode;
+  final IconData icon;
+  final String hintText;
+  final TextInputType keyboardType;
+  final TextInputAction textInputAction;
+  final bool enabled;
+  final int maxLength;
+  final Iterable<String> autofillHints;
+  final ValueChanged<String> onSubmitted;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return AnimatedBuilder(
+      animation: focusNode,
+      builder: (context, _) {
+        final focused = focusNode.hasFocus;
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          height: 58,
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          decoration: BoxDecoration(
+            color: focused
+                ? colorScheme.primary.withValues(alpha: .08)
+                : colorScheme.surfaceContainer,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: focused ? colorScheme.primary : colorScheme.outlineVariant,
+              width: focused ? 1.4 : 1,
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                icon,
+                color: focused
+                    ? colorScheme.primary
+                    : colorScheme.onSurfaceVariant,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: enabled ? focusNode.requestFocus : null,
+                  child: Stack(
+                    alignment: Alignment.centerLeft,
+                    children: [
+                      ValueListenableBuilder<TextEditingValue>(
+                        valueListenable: controller,
+                        builder: (context, value, _) {
+                          if (value.text.isNotEmpty) {
+                            return const SizedBox.shrink();
+                          }
+
+                          return IgnorePointer(
+                            child: Text(
+                              hintText,
+                              style: TextStyle(
+                                color: colorScheme.onSurfaceVariant,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 16,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                      EditableText(
+                        controller: controller,
+                        focusNode: focusNode,
+                        autofillHints: autofillHints,
+                        keyboardType: keyboardType,
+                        textInputAction: textInputAction,
+                        readOnly: !enabled,
+                        inputFormatters: [
+                          LengthLimitingTextInputFormatter(maxLength),
+                        ],
+                        cursorColor: colorScheme.primary,
+                        backgroundCursorColor: colorScheme.outline,
+                        selectionColor: colorScheme.primary.withValues(
+                          alpha: .22,
+                        ),
+                        style: TextStyle(
+                          color: colorScheme.onSurface,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 16,
+                        ),
+                        onSubmitted: onSubmitted,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _CodeButton extends StatelessWidget {
+  const _CodeButton({
+    required this.enabled,
+    required this.label,
+    required this.onTap,
+  });
+
+  final bool enabled;
+  final String label;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: enabled ? onTap : null,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        width: 104,
+        height: 58,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: enabled
+              ? colorScheme.primary.withValues(alpha: .12)
+              : colorScheme.surfaceContainerHighest.withValues(alpha: .68),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: enabled
+                ? colorScheme.primary.withValues(alpha: .28)
+                : colorScheme.outlineVariant,
+          ),
+        ),
+        child: Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            color: enabled ? colorScheme.primary : colorScheme.onSurfaceVariant,
+            fontWeight: FontWeight.w900,
+            fontSize: 13,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PrimaryLoginButton extends StatelessWidget {
+  const _PrimaryLoginButton({required this.isLoading, required this.onTap});
+
+  final bool isLoading;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: isLoading ? null : onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        height: 52,
+        alignment: Alignment.center,
+        decoration: BoxDecoration(
+          color: isLoading
+              ? colorScheme.primary.withValues(alpha: .58)
+              : colorScheme.primary,
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: [
+            BoxShadow(
+              color: colorScheme.primary.withValues(alpha: .24),
+              blurRadius: 18,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: isLoading
+            ? SizedBox.square(
+                dimension: 18,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: colorScheme.onPrimary,
+                ),
+              )
+            : Text(
+                '登录',
+                style: TextStyle(
+                  color: colorScheme.onPrimary,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+      ),
+    );
+  }
+}
+
+class _LoginBackgroundPainter extends CustomPainter {
+  const _LoginBackgroundPainter({
+    required this.primary,
+    required this.secondary,
+    required this.outline,
+    required this.isDark,
+  });
+
+  final Color primary;
+  final Color secondary;
+  final Color outline;
+  final bool isDark;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final linePaint = Paint()
+      ..color = outline.withValues(alpha: isDark ? .28 : .58)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.1;
+
+    for (var i = 0; i < 5; i++) {
+      final y = size.height * (.12 + i * .05);
+      final path = Path()
+        ..moveTo(-20, y)
+        ..cubicTo(
+          size.width * .24,
+          y - 30,
+          size.width * .42,
+          y + 34,
+          size.width * .66,
+          y + 2,
+        )
+        ..cubicTo(
+          size.width * .82,
+          y - 20,
+          size.width * .98,
+          y + 18,
+          size.width + 30,
+          y - 4,
+        );
+      canvas.drawPath(path, linePaint);
+    }
+
+    final accentPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = 8;
+
+    final center = Offset(size.width * .84, size.height * .21);
+    final radius = math.min(size.width, size.height) * .18;
+    accentPaint.color = primary.withValues(alpha: isDark ? .30 : .22);
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radius),
+      math.pi * .72,
+      math.pi * .64,
+      false,
+      accentPaint,
+    );
+    accentPaint.color = secondary.withValues(alpha: isDark ? .22 : .16);
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radius + 22),
+      math.pi * .88,
+      math.pi * .46,
+      false,
+      accentPaint,
+    );
+
+    final barPaint = Paint()
+      ..color = primary.withValues(alpha: isDark ? .18 : .14)
+      ..style = PaintingStyle.fill;
+    final baseY = size.height * .78;
+    for (var i = 0; i < 18; i++) {
+      final x = size.width * .06 + i * 18;
+      final h = 18 + (math.sin(i * .8) + 1) * 22;
+      final rect = RRect.fromRectAndRadius(
+        Rect.fromLTWH(x, baseY - h, 6, h),
+        const Radius.circular(999),
+      );
+      canvas.drawRRect(rect, barPaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _LoginBackgroundPainter oldDelegate) {
+    return oldDelegate.primary != primary ||
+        oldDelegate.secondary != secondary ||
+        oldDelegate.outline != outline ||
+        oldDelegate.isDark != isDark;
+  }
+}

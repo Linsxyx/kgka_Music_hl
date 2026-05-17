@@ -6,14 +6,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart';
 
+import '../../controllers/auth_controller.dart';
 import '../../controllers/player_controller.dart';
 import '../../models/music_models.dart';
 import '../widgets/artwork.dart';
 
 class PlayerPage extends StatefulWidget {
-  const PlayerPage({super.key, required this.player});
+  const PlayerPage({super.key, required this.player, required this.auth});
 
   final PlayerController player;
+  final AuthController auth;
 
   @override
   State<PlayerPage> createState() => _PlayerPageState();
@@ -32,6 +34,7 @@ class _PlayerPageState extends State<PlayerPage> {
 
         return _PlayerBody(
           player: widget.player,
+          auth: widget.auth,
           song: song,
           onClose: () => Navigator.of(context).pop(),
           onQueue: () => _showQueue(context),
@@ -84,12 +87,14 @@ class _PlayerPageState extends State<PlayerPage> {
 class _PlayerBody extends StatefulWidget {
   const _PlayerBody({
     required this.player,
+    required this.auth,
     required this.song,
     required this.onClose,
     required this.onQueue,
   });
 
   final PlayerController player;
+  final AuthController auth;
   final Song song;
   final VoidCallback onClose;
   final VoidCallback onQueue;
@@ -120,6 +125,7 @@ class _PlayerBodyState extends State<_PlayerBody> {
             child: Column(
               children: [
                 _TopBar(
+                  auth: widget.auth,
                   song: widget.song,
                   onClose: widget.onClose,
                   onQueue: widget.onQueue,
@@ -223,67 +229,75 @@ class _FallbackBackground extends StatelessWidget {
 
 class _TopBar extends StatelessWidget {
   const _TopBar({
+    required this.auth,
     required this.song,
     required this.onClose,
     required this.onQueue,
   });
 
+  final AuthController auth;
   final Song song;
   final VoidCallback onClose;
   final VoidCallback onQueue;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 8, 16, 6),
-      child: Row(
-        children: [
-          IconButton(
-            tooltip: '返回',
-            color: Colors.white,
-            onPressed: onClose,
-            icon: const Icon(Icons.keyboard_arrow_down_rounded),
-          ),
-          const SizedBox(width: 4),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  song.title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w800,
-                  ),
+    return AnimatedBuilder(
+      animation: auth,
+      builder: (context, _) {
+        final liked = auth.isLiked(song);
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(8, 8, 16, 6),
+          child: Row(
+            children: [
+              IconButton(
+                tooltip: '返回',
+                color: Colors.white,
+                onPressed: onClose,
+                icon: const Icon(Icons.keyboard_arrow_down_rounded),
+              ),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      song.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    Text(
+                      song.artist,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Colors.white.withValues(alpha: .72),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ),
-                Text(
-                  song.artist,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Colors.white.withValues(alpha: .72),
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
+              ),
+              _GlassIconButton(
+                tooltip: liked ? '取消喜欢' : '喜欢',
+                onPressed: () => auth.toggleLike(song),
+                icon: liked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+              ),
+              const SizedBox(width: 8),
+              _GlassIconButton(
+                tooltip: '队列',
+                onPressed: onQueue,
+                icon: Icons.more_horiz_rounded,
+              ),
+            ],
           ),
-          _GlassIconButton(
-            tooltip: '收藏',
-            onPressed: () {},
-            icon: Icons.star_rounded,
-          ),
-          const SizedBox(width: 8),
-          _GlassIconButton(
-            tooltip: '队列',
-            onPressed: onQueue,
-            icon: Icons.more_horiz_rounded,
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

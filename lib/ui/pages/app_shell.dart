@@ -44,7 +44,7 @@ class _AppShellState extends State<AppShell> {
             left: 0,
             right: 0,
             bottom: bottomInset + kBottomNavigationBarHeight + 10,
-            child: MiniPlayer(player: widget.player),
+            child: MiniPlayer(player: widget.player, auth: widget.auth),
           ),
         ],
       ),

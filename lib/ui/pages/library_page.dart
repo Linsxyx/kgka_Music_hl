@@ -41,39 +41,57 @@ class LibraryPage extends StatelessWidget {
           return CustomScrollView(
             slivers: [
               const SliverToBoxAdapter(child: _MyHeader()),
-              if (!auth.isLoggedIn)
-                SliverToBoxAdapter(child: _LoginPanel(auth: auth))
+              SliverToBoxAdapter(child: _AccountCard(auth: auth)),
+              SliverToBoxAdapter(
+                child: _QuickStats(
+                  auth: auth,
+                  onLikedTap: auth.likedPlaylist == null
+                      ? null
+                      : () => openPlaylist(auth.likedPlaylist!),
+                ),
+              ),
+              if (auth.playlists.isEmpty)
+                const SliverToBoxAdapter(child: _EmptyPlaylists())
               else ...[
-                SliverToBoxAdapter(child: _AccountCard(auth: auth)),
                 SliverToBoxAdapter(
-                  child: _QuickStats(
-                    auth: auth,
-                    onLikedTap: auth.likedPlaylist == null
-                        ? null
-                        : () => openPlaylist(auth.likedPlaylist!),
+                  child: _SectionHeader(
+                    title: '创建的歌单',
+                    count: createdPlaylists.length,
                   ),
                 ),
-                if (auth.playlists.isEmpty)
-                  const SliverToBoxAdapter(child: _EmptyPlaylists())
-                else ...[
+                SliverPadding(
+                  padding: EdgeInsets.fromLTRB(
+                    18,
+                    0,
+                    18,
+                    collectedPlaylists.isEmpty ? 160 : 20,
+                  ),
+                  sliver: SliverList.separated(
+                    itemCount: createdPlaylists.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 8),
+                    itemBuilder: (context, index) {
+                      final playlist = createdPlaylists[index];
+                      return _PlaylistRow(
+                        playlist: playlist,
+                        onTap: () => openPlaylist(playlist),
+                      );
+                    },
+                  ),
+                ),
+                if (collectedPlaylists.isNotEmpty) ...[
                   SliverToBoxAdapter(
                     child: _SectionHeader(
-                      title: '创建的歌单',
-                      count: createdPlaylists.length,
+                      title: '收藏的歌单',
+                      count: collectedPlaylists.length,
                     ),
                   ),
                   SliverPadding(
-                    padding: EdgeInsets.fromLTRB(
-                      18,
-                      0,
-                      18,
-                      collectedPlaylists.isEmpty ? 160 : 20,
-                    ),
+                    padding: const EdgeInsets.fromLTRB(18, 0, 18, 160),
                     sliver: SliverList.separated(
-                      itemCount: createdPlaylists.length,
+                      itemCount: collectedPlaylists.length,
                       separatorBuilder: (_, _) => const SizedBox(height: 8),
                       itemBuilder: (context, index) {
-                        final playlist = createdPlaylists[index];
+                        final playlist = collectedPlaylists[index];
                         return _PlaylistRow(
                           playlist: playlist,
                           onTap: () => openPlaylist(playlist),
@@ -81,28 +99,6 @@ class LibraryPage extends StatelessWidget {
                       },
                     ),
                   ),
-                  if (collectedPlaylists.isNotEmpty) ...[
-                    SliverToBoxAdapter(
-                      child: _SectionHeader(
-                        title: '收藏的歌单',
-                        count: collectedPlaylists.length,
-                      ),
-                    ),
-                    SliverPadding(
-                      padding: const EdgeInsets.fromLTRB(18, 0, 18, 160),
-                      sliver: SliverList.separated(
-                        itemCount: collectedPlaylists.length,
-                        separatorBuilder: (_, _) => const SizedBox(height: 8),
-                        itemBuilder: (context, index) {
-                          final playlist = collectedPlaylists[index];
-                          return _PlaylistRow(
-                            playlist: playlist,
-                            onTap: () => openPlaylist(playlist),
-                          );
-                        },
-                      ),
-                    ),
-                  ],
                 ],
               ],
             ],
@@ -125,120 +121,6 @@ class _MyHeader extends StatelessWidget {
         style: Theme.of(context).textTheme.headlineSmall?.copyWith(
           fontWeight: FontWeight.w900,
           fontSize: 26,
-        ),
-      ),
-    );
-  }
-}
-
-class _LoginPanel extends StatefulWidget {
-  const _LoginPanel({required this.auth});
-
-  final AuthController auth;
-
-  @override
-  State<_LoginPanel> createState() => _LoginPanelState();
-}
-
-class _LoginPanelState extends State<_LoginPanel> {
-  final _mobileController = TextEditingController();
-  final _codeController = TextEditingController();
-
-  @override
-  void dispose() {
-    _mobileController.dispose();
-    _codeController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(18, 4, 18, 160),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: colorScheme.surfaceContainer,
-          borderRadius: BorderRadius.circular(18),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(
-                '登录 KA Music',
-                style: Theme.of(
-                  context,
-                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                '同步你的歌单和账号信息。',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: _mobileController,
-                keyboardType: TextInputType.phone,
-                decoration: const InputDecoration(
-                  prefixIcon: Icon(Icons.phone_iphone_rounded),
-                  labelText: '手机号',
-                ),
-              ),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _codeController,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        prefixIcon: Icon(Icons.password_rounded),
-                        labelText: '验证码',
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  FilledButton.tonal(
-                    onPressed: widget.auth.isLoading
-                        ? null
-                        : () => widget.auth.sendCode(
-                            _mobileController.text.trim(),
-                          ),
-                    child: const Text('获取'),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
-              FilledButton(
-                onPressed: widget.auth.isLoading
-                    ? null
-                    : () => widget.auth.login(
-                        _mobileController.text.trim(),
-                        _codeController.text.trim(),
-                      ),
-                child: widget.auth.isLoading
-                    ? const SizedBox.square(
-                        dimension: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Text('登录'),
-              ),
-              if (widget.auth.errorMessage case final message?) ...[
-                const SizedBox(height: 10),
-                Text(
-                  message,
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: colorScheme.error),
-                ),
-              ],
-            ],
-          ),
         ),
       ),
     );
