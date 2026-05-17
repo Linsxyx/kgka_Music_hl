@@ -14,6 +14,7 @@ class MusicApi {
   void setSession(LoginSession? session) {
     _client.token = session?.token;
     _client.t1 = session?.t1;
+    _client.sessionId = session?.sessionId;
   }
 
   Future<void> sendLoginCode(String mobile) async {
@@ -30,7 +31,13 @@ class MusicApi {
         body: {'mobile': mobile, 'code': code},
       ),
     );
-    return LoginSession.fromJson(json);
+    final session = LoginSession.fromJson(json);
+    return LoginSession(
+      userId: session.userId,
+      token: session.token,
+      t1: session.t1,
+      sessionId: _client.sessionId,
+    );
   }
 
   Future<LoginSession> refreshToken() async {

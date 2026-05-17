@@ -1,11 +1,14 @@
 class LoginSession {
-  const LoginSession({this.userId, this.token, this.t1});
+  const LoginSession({this.userId, this.token, this.t1, this.sessionId});
 
   final String? userId;
   final String? token;
   final String? t1;
+  final String? sessionId;
 
-  bool get isValid => token != null && token!.isNotEmpty;
+  bool get isValid =>
+      (token != null && token!.isNotEmpty) ||
+      (sessionId != null && sessionId!.isNotEmpty);
 
   factory LoginSession.fromJson(Map<String, dynamic> json) {
     return LoginSession(
@@ -249,11 +252,9 @@ class Song {
           asString(json['singer_name']) ??
           '未知艺人',
       hash: hash,
-      albumId:
-          asString(json['AlbumID']) ?? asString(json['album_id']),
+      albumId: asString(json['AlbumID']) ?? asString(json['album_id']),
       albumAudioId: songId,
-      albumName:
-          asString(json['AlbumName']) ?? asString(json['album_name']),
+      albumName: asString(json['AlbumName']) ?? asString(json['album_name']),
       coverUrl: normalizeImageUrl(imageUrl),
       duration:
           durationFromSeconds(json['Duration']) ??

@@ -20,6 +20,7 @@ class ApiClient {
   final http.Client _client;
   String? token;
   String? t1;
+  String? sessionId;
 
   Future<dynamic> get(String path, [Map<String, Object?> query = const {}]) {
     return _send(
@@ -54,12 +55,19 @@ class ApiClient {
     if (t1 case final value?) {
       headers['t1'] = value;
     }
+    if (sessionId case final value?) {
+      headers['X-Kg-Session-Id'] = value;
+    }
 
     return headers;
   }
 
   Future<dynamic> _send(Future<http.Response> Function() request) async {
     final response = await request();
+    final responseSessionId = response.headers['x-kg-session-id'];
+    if (responseSessionId != null && responseSessionId.isNotEmpty) {
+      sessionId = responseSessionId;
+    }
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw ApiException(response.body, statusCode: response.statusCode);
     }
