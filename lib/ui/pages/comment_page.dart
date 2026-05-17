@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../models/music_models.dart';
 import '../../services/music_api.dart';
@@ -105,12 +106,19 @@ class _CommentPageState extends State<CommentPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('评论'),
-        centerTitle: false,
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle(
+        statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+        statusBarBrightness: isDark ? Brightness.light : Brightness.dark,
       ),
-      body: _buildBody(),
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('评论'),
+          centerTitle: false,
+        ),
+        body: _buildBody(),
+      ),
     );
   }
 
