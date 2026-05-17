@@ -45,7 +45,14 @@ class _ArtistDetailPageState extends State<ArtistDetailPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(widget.artist.name)),
+      extendBodyBehindAppBar: true,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        title: const SizedBox.shrink(),
+      ),
       body: FutureBuilder<_ArtistDetailData>(
         future: _future,
         builder: (context, snapshot) {
@@ -131,57 +138,115 @@ class _ArtistHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     final avatar = detail.avatarUrl ?? fallback.avatarUrl;
+    final topPadding = MediaQuery.paddingOf(context).top;
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(22, 18, 22, 22),
-      child: Column(
-        children: [
-          Container(
-            width: 116,
-            height: 116,
-            clipBehavior: Clip.antiAlias,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: colorScheme.surfaceContainerHighest,
+    return ClipRRect(
+      borderRadius: const BorderRadius.vertical(bottom: Radius.circular(28)),
+      child: SizedBox(
+        height: topPadding + 286,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            if (avatar == null)
+              const _ArtistPosterFallback()
+            else
+              Image.network(
+                avatar,
+                fit: BoxFit.cover,
+                alignment: Alignment.topCenter,
+                errorBuilder: (context, error, stackTrace) =>
+                    const _ArtistPosterFallback(),
+              ),
+            DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.black.withValues(alpha: .20),
+                    Colors.black.withValues(alpha: .06),
+                    Colors.black.withValues(alpha: .58),
+                  ],
+                  stops: const [0, .48, 1],
+                ),
+              ),
             ),
-            child: avatar == null
-                ? Icon(
-                    Icons.person_rounded,
-                    size: 54,
-                    color: colorScheme.primary,
-                  )
-                : Image.network(
-                    avatar,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) => Icon(
-                      Icons.person_rounded,
-                      size: 54,
-                      color: colorScheme.primary,
+            Positioned(
+              left: 22,
+              right: 22,
+              bottom: 26,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    detail.name,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w900,
+                      height: 1.08,
                     ),
                   ),
-          ),
-          const SizedBox(height: 18),
-          Text(
-            detail.name,
-            textAlign: TextAlign.center,
-            style: Theme.of(
-              context,
-            ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            detail.birthday?.isNotEmpty == true
-                ? '生日 ${detail.birthday}'
-                : '歌手 ID ${detail.id}',
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: colorScheme.onSurfaceVariant,
-              fontWeight: FontWeight.w600,
+                  const SizedBox(height: 10),
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: .18),
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: .22),
+                      ),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      child: Text(
+                        detail.birthday?.isNotEmpty == true
+                            ? '生日 ${detail.birthday}'
+                            : '歌手 ID ${detail.id}',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Colors.white.withValues(alpha: .88),
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ArtistPosterFallback extends StatelessWidget {
+  const _ArtistPosterFallback();
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            colorScheme.primary.withValues(alpha: .90),
+            const Color(0xFF70D6FF),
+            colorScheme.secondary.withValues(alpha: .80),
+          ],
+        ),
+      ),
+      child: Icon(
+        Icons.person_rounded,
+        size: 88,
+        color: Colors.white.withValues(alpha: .86),
       ),
     );
   }
@@ -340,15 +405,13 @@ class _ArtistDetailSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final topPadding = MediaQuery.paddingOf(context).top;
+
     return ListView(
-      padding: const EdgeInsets.fromLTRB(18, 20, 18, 30),
+      padding: EdgeInsets.fromLTRB(18, topPadding + 18, 18, 30),
       children: [
-        Center(child: _SkeletonBox.circle(size: 116)),
-        const SizedBox(height: 20),
-        const Center(child: _SkeletonBox(width: 128, height: 24, radius: 8)),
-        const SizedBox(height: 10),
-        const Center(child: _SkeletonBox(width: 92, height: 16, radius: 7)),
-        const SizedBox(height: 34),
+        const _SkeletonBox(width: double.infinity, height: 286, radius: 28),
+        const SizedBox(height: 24),
         const _SkeletonBox(width: 110, height: 22, radius: 8),
         const SizedBox(height: 18),
         for (var index = 0; index < 8; index++) ...[
@@ -392,11 +455,6 @@ class _SkeletonBox extends StatelessWidget {
     required this.height,
     required this.radius,
   });
-
-  const _SkeletonBox.circle({required double size})
-    : width = size,
-      height = size,
-      radius = size / 2;
 
   final double width;
   final double height;

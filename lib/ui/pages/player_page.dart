@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 
@@ -195,6 +196,7 @@ class _PlayerBodyState extends State<_PlayerBody> {
                             onNotification: _handlePageScrollNotification,
                             child: PageView(
                               controller: _pageController,
+                              allowImplicitScrolling: true,
                               onPageChanged: (value) =>
                                   _setPageState(page: value),
                               children: [
@@ -214,6 +216,7 @@ class _PlayerBodyState extends State<_PlayerBody> {
                                   song: widget.song,
                                   focusRequest: _lyricFocusRequest,
                                   isPageActive: _lyricPageActive,
+                                  isPageTransitioning: _pageScrolling,
                                 ),
                               ],
                             ),
@@ -1404,12 +1407,14 @@ class _LyricPlayerPage extends StatefulWidget {
     required this.song,
     required this.focusRequest,
     required this.isPageActive,
+    required this.isPageTransitioning,
   });
 
   final PlayerController player;
   final Song song;
   final int focusRequest;
   final bool isPageActive;
+  final bool isPageTransitioning;
 
   @override
   State<_LyricPlayerPage> createState() => _LyricPlayerPageState();
@@ -1442,6 +1447,7 @@ class _LyricPlayerPageState extends State<_LyricPlayerPage>
             showTranslation: _showTranslation,
             focusRequest: widget.focusRequest,
             isPageActive: widget.isPageActive,
+            isPageTransitioning: widget.isPageTransitioning,
           ),
           if (hasTranslation)
             Positioned(
@@ -1473,6 +1479,7 @@ class _LyricViewport extends StatefulWidget {
     required this.showTranslation,
     required this.focusRequest,
     required this.isPageActive,
+    required this.isPageTransitioning,
   });
 
   final PlayerController player;
@@ -1483,6 +1490,7 @@ class _LyricViewport extends StatefulWidget {
   final bool showTranslation;
   final int focusRequest;
   final bool isPageActive;
+  final bool isPageTransitioning;
 
   @override
   State<_LyricViewport> createState() => _LyricViewportState();
@@ -1497,6 +1505,7 @@ class _LyricViewportState extends State<_LyricViewport> {
   int _frameActiveIndex = -1;
   bool _manualScrolling = false;
   bool _autoScrolling = false;
+  bool _alignmentRetryScheduled = false;
   double _scrollStretch = 0;
 
   @override
@@ -1507,7 +1516,9 @@ class _LyricViewportState extends State<_LyricViewport> {
     _frameActiveIndex = _activeIndexFor(_framePosition);
     _ticker = Ticker(_onTick);
     _syncTicker();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _forceLockToActive());
+    WidgetsBinding.instance.addPostFrameCallback(
+      (_) => _syncToActive(immediate: true, resetManualScroll: false),
+    );
   }
 
   @override
@@ -1521,11 +1532,23 @@ class _LyricViewportState extends State<_LyricViewport> {
     final lyricsChanged = oldWidget.lyrics != widget.lyrics;
     final focusRequested = oldWidget.focusRequest != widget.focusRequest;
     final seekChanged = oldWidget.seekRevision != widget.seekRevision;
+    final activeIndexChanged = oldWidget.activeIndex != widget.activeIndex;
     final becameActive = !oldWidget.isPageActive && widget.isPageActive;
-    if ((lyricsChanged || focusRequested || seekChanged || becameActive) &&
-        widget.isPageActive) {
-      _frameActiveIndex = nextIndex;
-      WidgetsBinding.instance.addPostFrameCallback((_) => _forceLockToActive());
+    final transitionFinished =
+        oldWidget.isPageTransitioning && !widget.isPageTransitioning;
+    if (lyricsChanged ||
+        focusRequested ||
+        seekChanged ||
+        activeIndexChanged ||
+        becameActive ||
+        transitionFinished) {
+      setState(() => _frameActiveIndex = nextIndex);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _syncToActive(
+          immediate: true,
+          resetManualScroll: focusRequested || seekChanged,
+        );
+      });
     }
     _syncTicker();
   }
@@ -1548,6 +1571,7 @@ class _LyricViewportState extends State<_LyricViewport> {
   void _syncTicker() {
     final shouldTick =
         widget.isPageActive &&
+        !widget.isPageTransitioning &&
         widget.player.isPlaying &&
         widget.lyrics.isNotEmpty &&
         !widget.player.isScrubbing;
@@ -1570,7 +1594,9 @@ class _LyricViewportState extends State<_LyricViewport> {
       _frameActiveIndex = activeIndex;
     });
     if (shouldScroll) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToActive());
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _alignToActive(animated: true),
+      );
     }
   }
 
@@ -1578,74 +1604,98 @@ class _LyricViewportState extends State<_LyricViewport> {
     return _activeLyricIndexFor(widget.lyrics, position);
   }
 
-  void _scrollToActive() {
-    if (!widget.isPageActive || _manualScrolling || _frameActiveIndex < 0) {
+  bool get _canAlignToActive {
+    return !widget.isPageTransitioning &&
+        !_manualScrolling &&
+        _controller.hasClients &&
+        _frameActiveIndex >= 0;
+  }
+
+  void _alignToActive({required bool animated}) {
+    if (!_canAlignToActive) {
       return;
     }
     if (_frameActiveIndex >= _lineKeys.length) {
       return;
     }
-    final context = _lineKeys[_frameActiveIndex].currentContext;
-    if (context == null) {
-      _jumpToEstimatedPosition();
-      WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToActive());
+    final targetOffset = _targetOffsetForActive();
+    if (targetOffset == null) {
+      _scheduleAlignmentRetry(animated: animated);
       return;
     }
+
+    if ((_controller.offset - targetOffset).abs() < .5) {
+      return;
+    }
+
     _autoScrolling = true;
-    Scrollable.ensureVisible(
-      context,
-      alignment: .34,
-      duration: const Duration(milliseconds: 380),
-      curve: Curves.easeOutCubic,
-      alignmentPolicy: ScrollPositionAlignmentPolicy.explicit,
-    ).whenComplete(() {
+    if (animated && widget.isPageActive) {
+      _controller
+          .animateTo(
+            targetOffset,
+            duration: const Duration(milliseconds: 360),
+            curve: Curves.easeOutCubic,
+          )
+          .whenComplete(() {
+            if (mounted) {
+              _autoScrolling = false;
+            }
+          });
+    } else {
+      _controller.jumpTo(targetOffset);
+      _autoScrolling = false;
+    }
+  }
+
+  double? _targetOffsetForActive() {
+    final context = _lineKeys[_frameActiveIndex].currentContext;
+    final renderObject = context?.findRenderObject();
+    if (renderObject == null) {
+      return null;
+    }
+    final viewport = RenderAbstractViewport.maybeOf(renderObject);
+    if (viewport == null) {
+      return null;
+    }
+    final maxScroll = _controller.position.maxScrollExtent;
+    return viewport
+        .getOffsetToReveal(renderObject, .34)
+        .offset
+        .clamp(0.0, maxScroll)
+        .toDouble();
+  }
+
+  void _scheduleAlignmentRetry({required bool animated}) {
+    if (_alignmentRetryScheduled) {
+      return;
+    }
+    _alignmentRetryScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _alignmentRetryScheduled = false;
       if (mounted) {
-        _autoScrolling = false;
+        _alignToActive(animated: animated);
       }
     });
   }
 
-  void _jumpToEstimatedPosition() {
-    if (!widget.isPageActive ||
-        !_controller.hasClients ||
-        _frameActiveIndex < 0) {
+  void _syncToActive({
+    required bool immediate,
+    required bool resetManualScroll,
+  }) {
+    if (!mounted || widget.isPageTransitioning) {
       return;
     }
-    const topPadding = 180.0;
-    const estimatedLineHeight = 80.0;
-    final viewportHeight = _controller.position.viewportDimension;
-    final maxScroll = _controller.position.maxScrollExtent;
-    if (viewportHeight <= 0) {
+    if (resetManualScroll) {
+      _resumeAutoScrollTimer?.cancel();
+      _manualScrolling = false;
+    }
+    if (_manualScrolling) {
       return;
     }
-    final offset =
-        topPadding +
-        _frameActiveIndex * estimatedLineHeight -
-        viewportHeight * 0.34;
-    _controller.jumpTo(offset.clamp(0.0, maxScroll));
-  }
-
-  void _forceLockToActive() {
-    if (!mounted || !widget.isPageActive) {
-      return;
-    }
-    _resumeAutoScrollTimer?.cancel();
-    _manualScrolling = false;
     _framePosition = widget.player.smoothPosition;
     _frameActiveIndex = _activeIndexFor(_framePosition);
-    _jumpToEstimatedPosition();
     setState(() {});
-    WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToActive());
-    Timer(const Duration(milliseconds: 80), () {
-      if (mounted) {
-        _scrollToActive();
-      }
-    });
-    Timer(const Duration(milliseconds: 220), () {
-      if (mounted) {
-        _scrollToActive();
-      }
-    });
+    _alignToActive(animated: !immediate);
   }
 
   bool _handleScrollNotification(ScrollNotification notification) {
@@ -1694,7 +1744,7 @@ class _LyricViewportState extends State<_LyricViewport> {
         return;
       }
       _manualScrolling = false;
-      _scrollToActive();
+      _alignToActive(animated: true);
     });
   }
 
