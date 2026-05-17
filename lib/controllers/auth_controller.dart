@@ -44,12 +44,15 @@ class AuthController extends ChangeNotifier {
     if (playlist == null) return;
 
     final liked = _likedHashes.contains(song.hash);
+    final targetListId = playlist.listId?.isNotEmpty == true
+        ? playlist.listId!
+        : playlist.id;
     try {
       if (liked) {
-        await _api.removeFromPlaylist(playlist.id, song);
+        await _api.removeFromPlaylist(targetListId, song);
         _likedHashes.remove(song.hash);
       } else {
-        await _api.addToPlaylist(playlist.id, song);
+        await _api.addToPlaylist(targetListId, song);
         _likedHashes.add(song.hash);
       }
       await _persistLikedHashes();

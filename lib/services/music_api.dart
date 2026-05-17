@@ -202,11 +202,11 @@ class MusicApi {
     return PlayUrl.fromJson(json);
   }
 
-  Future<void> addToPlaylist(String playlistId, Song song) async {
+  Future<void> addToPlaylist(String listId, Song song) async {
     await _client.post(
       '/playlist/tracks/add',
       body: {
-        'listId': playlistId,
+        'listId': listId,
         'songs': [
           {
             'name': song.title,
@@ -219,10 +219,10 @@ class MusicApi {
     );
   }
 
-  Future<void> removeFromPlaylist(String playlistId, Song song) async {
+  Future<void> removeFromPlaylist(String listId, Song song) async {
     await _client.post(
       '/playlist/tracks/del',
-      query: {'listid': playlistId, 'fileids': song.id},
+      query: {'listid': listId, 'fileids': song.id},
     );
   }
 
@@ -231,8 +231,9 @@ class MusicApi {
     final categories = asList(json['category']);
     final keywords = <String>[];
     for (final category in categories.whereType<Map<String, dynamic>>()) {
-      for (final item
-          in asList(category['keywords']).whereType<Map<String, dynamic>>()) {
+      for (final item in asList(
+        category['keywords'],
+      ).whereType<Map<String, dynamic>>()) {
         final keyword = asString(item['keyword']);
         if (keyword != null) keywords.add(keyword);
       }
@@ -265,16 +266,11 @@ class MusicApi {
     });
     if (kDebugMode) {
       debugPrint('[KA Music][search] keywords="$keywords"');
-      debugPrint(
-        '[KA Music][search] raw type: ${raw.runtimeType}',
-      );
+      debugPrint('[KA Music][search] raw type: ${raw.runtimeType}');
       if (raw is List) {
         debugPrint('[KA Music][search] list length: ${raw.length}');
       } else if (raw is Map) {
-        final map = raw as Map;
-        debugPrint(
-          '[KA Music][search] map keys: ${map.keys.toList()}',
-        );
+        debugPrint('[KA Music][search] map keys: ${raw.keys.toList()}');
       }
     }
     // API returns either a plain array or { songs: [...] }

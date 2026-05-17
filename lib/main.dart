@@ -1,20 +1,44 @@
 import 'package:flutter/material.dart';
+import 'package:audio_service/audio_service.dart';
 
 import 'config/app_config.dart';
 import 'controllers/auth_controller.dart';
 import 'controllers/player_controller.dart';
 import 'core/api_client.dart';
+import 'services/music_audio_handler.dart';
 import 'services/music_api.dart';
 import 'ui/app_theme.dart';
 import 'ui/pages/app_shell.dart';
 import 'ui/pages/login_page.dart';
 
-void main() {
-  runApp(const KaMusicApp());
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  final client = ApiClient();
+  final api = MusicApi(client);
+  final audioHandler = await AudioService.init(
+    builder: MusicAudioHandler.new,
+    config: const AudioServiceConfig(
+      androidNotificationChannelId: 'kgka_music_hl.playback',
+      androidNotificationChannelName: 'KA Music 播放控制',
+      androidStopForegroundOnPause: false,
+    ),
+  );
+
+  runApp(KaMusicApp(client: client, api: api, audioHandler: audioHandler));
 }
 
 class KaMusicApp extends StatefulWidget {
-  const KaMusicApp({super.key});
+  const KaMusicApp({
+    super.key,
+    required this.client,
+    required this.api,
+    required this.audioHandler,
+  });
+
+  final ApiClient client;
+  final MusicApi api;
+  final MusicAudioHandler audioHandler;
 
   @override
   State<KaMusicApp> createState() => _KaMusicAppState();
@@ -29,10 +53,10 @@ class _KaMusicAppState extends State<KaMusicApp> {
   @override
   void initState() {
     super.initState();
-    _client = ApiClient();
-    _api = MusicApi(_client);
+    _client = widget.client;
+    _api = widget.api;
     _auth = AuthController(_api);
-    _player = PlayerController(_api);
+    _player = PlayerController(_api, widget.audioHandler);
     _auth.restore();
   }
 

@@ -5,9 +5,11 @@ import 'package:just_audio/just_audio.dart';
 
 import '../models/music_models.dart';
 import '../services/music_api.dart';
+import '../services/music_audio_handler.dart';
 
 class PlayerController extends ChangeNotifier {
-  PlayerController(this._api) {
+  PlayerController(this._api, this._audioHandler) {
+    _audioHandler.attachTransportControls(onNext: next, onPrevious: previous);
     _positionSub = audioPlayer.positionStream.listen((value) {
       if (!_isSeeking) {
         _setPositionBase(value, playing: isPlaying);
@@ -31,7 +33,9 @@ class PlayerController extends ChangeNotifier {
   }
 
   final MusicApi _api;
-  final AudioPlayer audioPlayer = AudioPlayer();
+  final MusicAudioHandler _audioHandler;
+
+  AudioPlayer get audioPlayer => _audioHandler.audioPlayer;
 
   late final StreamSubscription<Duration> _positionSub;
   late final StreamSubscription<Duration?> _durationSub;
@@ -107,11 +111,16 @@ class PlayerController extends ChangeNotifier {
       if (playUrl.url.isEmpty) {
         throw Exception('这首歌暂时没有可播放地址');
       }
-      await audioPlayer.setUrl(playUrl.url);
+      await _audioHandler.loadSong(
+        song: song,
+        url: playUrl.url,
+        queueSongs: this.queue,
+        queueIndex: currentIndex,
+      );
       isPreparing = false;
       notifyListeners();
       unawaited(loadLyrics(song));
-      unawaited(audioPlayer.play());
+      unawaited(_audioHandler.play());
     } catch (error) {
       errorMessage = error.toString();
       isPreparing = false;
@@ -136,9 +145,9 @@ class PlayerController extends ChangeNotifier {
 
   Future<void> togglePlay() async {
     if (audioPlayer.playing) {
-      await audioPlayer.pause();
+      await _audioHandler.pause();
     } else {
-      await audioPlayer.play();
+      await _audioHandler.play();
     }
   }
 
@@ -159,7 +168,7 @@ class PlayerController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      await audioPlayer.seek(target);
+      await _audioHandler.seek(target);
       if (serial != _seekSerial) {
         return;
       }
@@ -194,7 +203,8 @@ class PlayerController extends ChangeNotifier {
     _positionSub.cancel();
     _durationSub.cancel();
     _stateSub.cancel();
-    audioPlayer.dispose();
+    _audioHandler.detachTransportControls();
+    unawaited(_audioHandler.close());
     super.dispose();
   }
 

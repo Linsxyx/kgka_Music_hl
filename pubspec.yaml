@@ -9,6 +9,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  audio_service: ^0.18.18
   http: ^1.5.0
   just_audio: ^0.10.4
   shared_preferences: ^2.5.3
