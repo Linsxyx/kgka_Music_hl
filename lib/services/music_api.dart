@@ -920,6 +920,14 @@ List<LyricLine> _mergeLyricVariants(
     return lines;
   }
 
+  final indexedTranslations = _indexedLyricVariants(
+    lines,
+    variants.translation,
+  );
+  final indexedRomanizations = _indexedLyricVariants(
+    lines,
+    variants.romanization,
+  );
   final merged = <LyricLine>[];
   for (var index = 0; index < lines.length; index++) {
     final line = lines[index];
@@ -931,22 +939,254 @@ List<LyricLine> _mergeLyricVariants(
               line.time.inMilliseconds,
               variants.translation.byTime,
             ) ??
-            (index < variants.translation.byIndex.length
-                ? variants.translation.byIndex[index]
-                : null),
+            indexedTranslations[index],
         romanization:
             variants.romanization.byTime[line.time.inMilliseconds] ??
             _nearestLyricVariant(
               line.time.inMilliseconds,
               variants.romanization.byTime,
             ) ??
-            (index < variants.romanization.byIndex.length
-                ? variants.romanization.byIndex[index]
-                : null),
+            indexedRomanizations[index],
       ),
     );
   }
   return merged;
+}
+
+Map<int, String> _indexedLyricVariants(
+  List<LyricLine> lines,
+  _TimedLyricVariant variant,
+) {
+  if (variant.byIndex.isEmpty) {
+    return const {};
+  }
+
+  final result = <int, String>{};
+  final targetLooksChinese = _variantLooksChinese(variant.byIndex);
+  var variantIndex = 0;
+
+  for (var lineIndex = 0; lineIndex < lines.length; lineIndex++) {
+    if (variantIndex >= variant.byIndex.length) {
+      break;
+    }
+    if (!_shouldConsumeIndexedVariantLine(
+      lines,
+      lineIndex,
+      targetLooksChinese: targetLooksChinese,
+    )) {
+      continue;
+    }
+
+    final text = variant.byIndex[variantIndex].trim();
+    variantIndex++;
+    if (text.isEmpty || _sameLyricText(lines[lineIndex].text, text)) {
+      continue;
+    }
+    result[lineIndex] = text;
+  }
+
+  return result;
+}
+
+bool _shouldConsumeIndexedVariantLine(
+  List<LyricLine> lines,
+  int index, {
+  required bool targetLooksChinese,
+}) {
+  final text = lines[index].text.trim();
+  if (text.isEmpty ||
+      _isDecorativeLyricText(text) ||
+      _isLyricMetadataText(text)) {
+    return false;
+  }
+  if (_looksLikeLeadingTitleCredit(lines, index)) {
+    return false;
+  }
+  if (targetLooksChinese && _lineAlreadyLooksChinese(text)) {
+    return false;
+  }
+  return true;
+}
+
+bool _looksLikeLeadingTitleCredit(List<LyricLine> lines, int index) {
+  if (index > 2) {
+    return false;
+  }
+  final text = lines[index].text;
+  final looksLikeTitle =
+      RegExp(r'\s[-–—]\s').hasMatch(text) || text.contains('/');
+  if (!looksLikeTitle) {
+    return false;
+  }
+  return lines
+      .skip(index + 1)
+      .take(6)
+      .any((line) => _isLyricMetadataText(line.text));
+}
+
+bool _isLyricMetadataText(String text) {
+  final normalized = text.trim();
+  final colonIndex = normalized.indexOf(RegExp(r'[:：]'));
+  if (colonIndex < 0 || colonIndex > 24) {
+    return false;
+  }
+
+  final prefix = normalized.substring(0, colonIndex).trim().toLowerCase();
+  if (prefix.isEmpty) {
+    return false;
+  }
+
+  const prefixes = {
+    '词',
+    '曲',
+    '作词',
+    '作曲',
+    '词曲',
+    '编曲',
+    '演唱',
+    '歌手',
+    '艺人',
+    '原唱',
+    '翻唱',
+    '制作',
+    '制作人',
+    '出品',
+    '发行',
+    '企划',
+    '监制',
+    '统筹',
+    '版权',
+    '录音',
+    '录音师',
+    '录音室',
+    '混音',
+    '混音师',
+    '混音室',
+    '母带',
+    '母带师',
+    '母带室',
+    '和声',
+    '配唱',
+    '吉他',
+    '贝斯',
+    '鼓',
+    '键盘',
+    '弦乐',
+    '人声',
+    'op',
+    'sp',
+    'cp',
+    'isrc',
+    'upc',
+    'vocal',
+    'vocals',
+    'lyric',
+    'lyrics',
+    'lyricist',
+    'composer',
+    'arranger',
+    'producer',
+    'produced by',
+    'mix',
+    'mixing',
+    'mixed',
+    'master',
+    'mastering',
+    'mastered',
+    'recording',
+    'guitar',
+    'bass',
+    'drums',
+    'keyboard',
+    'publisher',
+    'copyright',
+  };
+  return prefixes.contains(prefix);
+}
+
+bool _isDecorativeLyricText(String text) {
+  var meaningful = 0;
+  for (final rune in text.runes) {
+    if (_isHanRune(rune) ||
+        _isKanaRune(rune) ||
+        _isHangulRune(rune) ||
+        _isLatinRune(rune)) {
+      meaningful++;
+    }
+  }
+  return meaningful == 0;
+}
+
+bool _variantLooksChinese(List<String> values) {
+  var han = 0;
+  var otherLetters = 0;
+  for (final value in values.take(12)) {
+    for (final rune in value.runes) {
+      if (_isHanRune(rune)) {
+        han++;
+      } else if (_isKanaRune(rune) ||
+          _isHangulRune(rune) ||
+          _isLatinRune(rune)) {
+        otherLetters++;
+      }
+    }
+  }
+  return han >= 3 && han >= otherLetters;
+}
+
+bool _lineAlreadyLooksChinese(String text) {
+  var han = 0;
+  var kanaOrHangul = 0;
+  var latin = 0;
+  for (final rune in text.runes) {
+    if (_isHanRune(rune)) {
+      han++;
+    } else if (_isKanaRune(rune) || _isHangulRune(rune)) {
+      kanaOrHangul++;
+    } else if (_isLatinRune(rune)) {
+      latin++;
+    }
+  }
+  return han >= 2 && kanaOrHangul == 0 && latin == 0;
+}
+
+bool _sameLyricText(String a, String b) {
+  return _compactLyricText(a) == _compactLyricText(b);
+}
+
+String _compactLyricText(String text) {
+  final buffer = StringBuffer();
+  for (final rune in text.toLowerCase().runes) {
+    if (_isHanRune(rune) ||
+        _isKanaRune(rune) ||
+        _isHangulRune(rune) ||
+        _isLatinRune(rune) ||
+        (rune >= 0x30 && rune <= 0x39)) {
+      buffer.writeCharCode(rune);
+    }
+  }
+  return buffer.toString();
+}
+
+bool _isHanRune(int rune) {
+  return (rune >= 0x3400 && rune <= 0x4dbf) ||
+      (rune >= 0x4e00 && rune <= 0x9fff) ||
+      (rune >= 0xf900 && rune <= 0xfaff);
+}
+
+bool _isKanaRune(int rune) {
+  return (rune >= 0x3040 && rune <= 0x30ff) ||
+      (rune >= 0x31f0 && rune <= 0x31ff);
+}
+
+bool _isHangulRune(int rune) {
+  return (rune >= 0x1100 && rune <= 0x11ff) ||
+      (rune >= 0x3130 && rune <= 0x318f) ||
+      (rune >= 0xac00 && rune <= 0xd7af);
+}
+
+bool _isLatinRune(int rune) {
+  return (rune >= 0x41 && rune <= 0x5a) || (rune >= 0x61 && rune <= 0x7a);
 }
 
 String? _nearestLyricVariant(int time, Map<int, String> variants) {

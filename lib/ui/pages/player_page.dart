@@ -146,6 +146,7 @@ class _PlayerBodyState extends State<_PlayerBody> {
   bool? _lastSystemUiLandscape;
 
   bool get _lyricPageActive => _page == 1 && !_pageScrolling;
+  bool get _lyricPageVisible => _page == 1 || _pageScrolling;
 
   @override
   void dispose() {
@@ -216,6 +217,7 @@ class _PlayerBodyState extends State<_PlayerBody> {
                                   song: widget.song,
                                   focusRequest: _lyricFocusRequest,
                                   isPageActive: _lyricPageActive,
+                                  isPageVisible: _lyricPageVisible,
                                   isPageTransitioning: _pageScrolling,
                                 ),
                               ],
@@ -1206,6 +1208,28 @@ int _activeLyricIndexFor(List<LyricLine> lyrics, Duration position) {
   return index;
 }
 
+class _LyricScrollCurve extends Curve {
+  const _LyricScrollCurve();
+
+  @override
+  double transformInternal(double t) {
+    final eased = 1 - math.pow(1 - t, 3.2);
+    final tension = math.sin(t * math.pi) * .035 * (1 - t);
+    return (eased + tension).clamp(0.0, 1.0).toDouble();
+  }
+}
+
+class _LyricLineTensionCurve extends Curve {
+  const _LyricLineTensionCurve();
+
+  @override
+  double transformInternal(double t) {
+    final eased = 1 - math.pow(1 - t, 4);
+    final settle = math.sin(t * math.pi) * .05 * (1 - t);
+    return (eased + settle).clamp(0.0, 1.0).toDouble();
+  }
+}
+
 class _PosterLyricPreview extends StatefulWidget {
   const _PosterLyricPreview({required this.player});
 
@@ -1452,6 +1476,7 @@ class _LyricPlayerPage extends StatefulWidget {
     required this.song,
     required this.focusRequest,
     required this.isPageActive,
+    required this.isPageVisible,
     required this.isPageTransitioning,
   });
 
@@ -1459,6 +1484,7 @@ class _LyricPlayerPage extends StatefulWidget {
   final Song song;
   final int focusRequest;
   final bool isPageActive;
+  final bool isPageVisible;
   final bool isPageTransitioning;
 
   @override
@@ -1547,6 +1573,7 @@ class _LyricPlayerPageState extends State<_LyricPlayerPage>
             displayMode: displayMode,
             focusRequest: widget.focusRequest,
             isPageActive: widget.isPageActive,
+            isPageVisible: widget.isPageVisible,
             isPageTransitioning: widget.isPageTransitioning,
           ),
           if (canToggleLyricDisplayMode)
@@ -1582,6 +1609,7 @@ class _LyricViewport extends StatefulWidget {
     required this.displayMode,
     required this.focusRequest,
     required this.isPageActive,
+    required this.isPageVisible,
     required this.isPageTransitioning,
   });
 
@@ -1594,19 +1622,24 @@ class _LyricViewport extends StatefulWidget {
   final _LyricDisplayMode displayMode;
   final int focusRequest;
   final bool isPageActive;
+  final bool isPageVisible;
   final bool isPageTransitioning;
 
   @override
   State<_LyricViewport> createState() => _LyricViewportState();
 }
 
-class _LyricViewportState extends State<_LyricViewport> {
+class _LyricViewportState extends State<_LyricViewport>
+    with SingleTickerProviderStateMixin {
   final _controller = ScrollController();
   late final Ticker _ticker;
+  late final AnimationController _lineMotionController;
   var _lineKeys = <GlobalKey>[];
   Timer? _resumeAutoScrollTimer;
   Duration _framePosition = Duration.zero;
   int _frameActiveIndex = -1;
+  int _motionFromIndex = -1;
+  int _motionToIndex = -1;
   bool _manualScrolling = false;
   bool _autoScrolling = false;
   bool _alignmentRetryScheduled = false;
@@ -1618,6 +1651,15 @@ class _LyricViewportState extends State<_LyricViewport> {
     _syncLineKeys();
     _framePosition = widget.player.smoothPosition;
     _frameActiveIndex = _activeIndexFor(_framePosition);
+    _motionFromIndex = _frameActiveIndex;
+    _motionToIndex = _frameActiveIndex;
+    _lineMotionController =
+        AnimationController(
+            vsync: this,
+            duration: const Duration(milliseconds: 520),
+          )
+          ..value = 1
+          ..addListener(_handleLineMotionTick);
     _ticker = Ticker(_onTick);
     _syncTicker();
     WidgetsBinding.instance.addPostFrameCallback(
@@ -1631,9 +1673,7 @@ class _LyricViewportState extends State<_LyricViewport> {
     final songChanged = oldWidget.songHash != widget.songHash;
     final lyricsChanged = oldWidget.lyrics != widget.lyrics;
     _syncLineKeys(force: songChanged || lyricsChanged);
-    if (!widget.player.isScrubbing) {
-      _framePosition = widget.player.smoothPosition;
-    }
+    _framePosition = widget.player.smoothPosition;
     final nextIndex = _activeIndexFor(_framePosition);
     final focusRequested = oldWidget.focusRequest != widget.focusRequest;
     final seekChanged = oldWidget.seekRevision != widget.seekRevision;
@@ -1649,11 +1689,25 @@ class _LyricViewportState extends State<_LyricViewport> {
         becameActive ||
         transitionFinished) {
       final shouldResetManualScroll =
-          songChanged || lyricsChanged || focusRequested || seekChanged;
-      setState(() => _frameActiveIndex = nextIndex);
+          songChanged ||
+          lyricsChanged ||
+          focusRequested ||
+          seekChanged ||
+          widget.player.isScrubbing;
+      final immediateAlign =
+          songChanged ||
+          lyricsChanged ||
+          focusRequested ||
+          seekChanged ||
+          widget.player.isScrubbing;
+      _setFrameState(
+        position: _framePosition,
+        activeIndex: nextIndex,
+        animateMotion: !immediateAlign,
+      );
       WidgetsBinding.instance.addPostFrameCallback((_) {
         _syncToActive(
-          immediate: true,
+          immediate: immediateAlign,
           resetManualScroll: shouldResetManualScroll,
         );
       });
@@ -1664,9 +1718,18 @@ class _LyricViewportState extends State<_LyricViewport> {
   @override
   void dispose() {
     _resumeAutoScrollTimer?.cancel();
+    _lineMotionController
+      ..removeListener(_handleLineMotionTick)
+      ..dispose();
     _ticker.dispose();
     _controller.dispose();
     super.dispose();
+  }
+
+  void _handleLineMotionTick() {
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   void _syncLineKeys({bool force = false}) {
@@ -1678,8 +1741,7 @@ class _LyricViewportState extends State<_LyricViewport> {
 
   void _syncTicker() {
     final shouldTick =
-        widget.isPageActive &&
-        !widget.isPageTransitioning &&
+        widget.isPageVisible &&
         widget.player.isPlaying &&
         widget.lyrics.isNotEmpty &&
         !widget.player.isScrubbing;
@@ -1697,10 +1759,11 @@ class _LyricViewportState extends State<_LyricViewport> {
     final position = widget.player.smoothPosition;
     final activeIndex = _activeIndexFor(position);
     final shouldScroll = activeIndex != _frameActiveIndex;
-    setState(() {
-      _framePosition = position;
-      _frameActiveIndex = activeIndex;
-    });
+    _setFrameState(
+      position: position,
+      activeIndex: activeIndex,
+      animateMotion: shouldScroll,
+    );
     if (shouldScroll) {
       WidgetsBinding.instance.addPostFrameCallback(
         (_) => _alignToActive(animated: true),
@@ -1713,10 +1776,46 @@ class _LyricViewportState extends State<_LyricViewport> {
   }
 
   bool get _canAlignToActive {
-    return !widget.isPageTransitioning &&
+    return widget.isPageVisible &&
         !_manualScrolling &&
         _controller.hasClients &&
         _frameActiveIndex >= 0;
+  }
+
+  void _setFrameState({
+    required Duration position,
+    required int activeIndex,
+    required bool animateMotion,
+  }) {
+    if (_frameActiveIndex != activeIndex) {
+      if (animateMotion) {
+        _startLineMotion(_frameActiveIndex, activeIndex);
+      } else {
+        _finishLineMotion(activeIndex);
+      }
+    }
+    setState(() {
+      _framePosition = position;
+      _frameActiveIndex = activeIndex;
+    });
+  }
+
+  void _startLineMotion(int fromIndex, int toIndex) {
+    if (fromIndex < 0 || toIndex < 0 || fromIndex == toIndex) {
+      _finishLineMotion(toIndex);
+      return;
+    }
+    _motionFromIndex = fromIndex;
+    _motionToIndex = toIndex;
+    _lineMotionController.forward(from: 0);
+  }
+
+  void _finishLineMotion(int index) {
+    _motionFromIndex = index;
+    _motionToIndex = index;
+    _lineMotionController
+      ..stop()
+      ..value = 1;
   }
 
   void _alignToActive({required bool animated}) {
@@ -1741,8 +1840,8 @@ class _LyricViewportState extends State<_LyricViewport> {
       _controller
           .animateTo(
             targetOffset,
-            duration: const Duration(milliseconds: 360),
-            curve: Curves.easeOutCubic,
+            duration: const Duration(milliseconds: 520),
+            curve: const _LyricScrollCurve(),
           )
           .whenComplete(() {
             if (mounted) {
@@ -1790,7 +1889,7 @@ class _LyricViewportState extends State<_LyricViewport> {
     required bool immediate,
     required bool resetManualScroll,
   }) {
-    if (!mounted || widget.isPageTransitioning) {
+    if (!mounted || !widget.isPageVisible) {
       return;
     }
     if (resetManualScroll) {
@@ -1802,12 +1901,19 @@ class _LyricViewportState extends State<_LyricViewport> {
       return;
     }
     _framePosition = widget.player.smoothPosition;
-    _frameActiveIndex = _activeIndexFor(_framePosition);
-    setState(() {});
+    final activeIndex = _activeIndexFor(_framePosition);
+    _setFrameState(
+      position: _framePosition,
+      activeIndex: activeIndex,
+      animateMotion: !immediate,
+    );
     _alignToActive(animated: !immediate);
   }
 
   bool _handleScrollNotification(ScrollNotification notification) {
+    if (notification.metrics.axis != Axis.vertical) {
+      return false;
+    }
     if (_autoScrolling) {
       return false;
     }
@@ -1857,86 +1963,127 @@ class _LyricViewportState extends State<_LyricViewport> {
     });
   }
 
+  double _lineMotionPullFor(int index) {
+    if (_motionFromIndex < 0 ||
+        _motionToIndex < 0 ||
+        _motionFromIndex == _motionToIndex) {
+      return 0;
+    }
+
+    final rawProgress = _lineMotionController.value;
+    if (rawProgress >= 1) {
+      return 0;
+    }
+
+    final distanceFromTarget = (index - _motionToIndex).abs();
+    final delay = (distanceFromTarget * .045).clamp(0.0, .28);
+    final localProgress = rawProgress <= delay
+        ? 0.0
+        : ((rawProgress - delay) / (1 - delay)).clamp(0.0, 1.0).toDouble();
+    final eased = const _LyricLineTensionCurve().transform(localProgress);
+    final direction = (_motionToIndex - _motionFromIndex).sign.toDouble();
+    final amplitude = 26.0 * math.exp(-distanceFromTarget * .32);
+    return direction * amplitude * (1 - eased);
+  }
+
+  double _bottomBlurFor(int distance) {
+    if (distance <= 3) {
+      return 0;
+    }
+    return ((distance - 3) * .42).clamp(0.0, 1.6).toDouble();
+  }
+
   Widget _buildLyricList(List<LyricLine> lyrics) {
     return NotificationListener<ScrollNotification>(
       onNotification: _handleScrollNotification,
-      child: ListView(
+      child: SingleChildScrollView(
         controller: _controller,
         padding: const EdgeInsets.fromLTRB(0, 180, 0, 220),
-        children: [
-          for (var index = 0; index < lyrics.length; index++)
-            Builder(
-              builder: (context) {
-                final active = index == _frameActiveIndex;
-                final distance = index - _frameActiveIndex;
-                final nearby = distance.abs() <= 1;
-                final pull = !active
-                    ? (_scrollStretch * (1 / (distance.abs() + 1))).clamp(
-                        -10.0,
-                        10.0,
-                      )
-                    : 0.0;
-                final scale = active
-                    ? 1.0
-                    : (1 - (pull.abs() / 260)).clamp(.96, 1.0);
-                final line = lyrics[index];
-                final secondaryText = _secondaryLyricText(
-                  line,
-                  widget.displayMode,
-                );
-                return KeyedSubtree(
-                  key: _lineKeys[index],
-                  child: AnimatedOpacity(
-                    duration: const Duration(milliseconds: 220),
-                    opacity: active ? 1 : (nearby ? .46 : .22),
-                    child: TweenAnimationBuilder<double>(
-                      tween: Tween(begin: 0, end: pull),
-                      duration: const Duration(milliseconds: 260),
-                      curve: Curves.easeOutCubic,
-                      builder: (context, animatedPull, child) {
-                        return Transform.translate(
-                          offset: Offset(0, animatedPull),
-                          child: Transform.scale(
-                            scale: scale,
-                            alignment: Alignment.centerLeft,
-                            child: child,
-                          ),
-                        );
-                      },
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _LyricText(
-                              line: line,
-                              active: active,
-                              position: _framePosition,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (var index = 0; index < lyrics.length; index++)
+              Builder(
+                builder: (context) {
+                  final active = index == _frameActiveIndex;
+                  final distance = index - _frameActiveIndex;
+                  final nearby = distance.abs() <= 1;
+                  final manualPull = !active
+                      ? (_scrollStretch * (1 / (distance.abs() + 1))).clamp(
+                          -10.0,
+                          10.0,
+                        )
+                      : 0.0;
+                  final motionPull = _lineMotionPullFor(index);
+                  final pull = manualPull + motionPull;
+                  final blur = _bottomBlurFor(distance);
+                  final line = lyrics[index];
+                  final secondaryText = _secondaryLyricText(
+                    line,
+                    widget.displayMode,
+                  );
+                  return KeyedSubtree(
+                    key: _lineKeys[index],
+                    child: AnimatedOpacity(
+                      duration: const Duration(milliseconds: 220),
+                      opacity: active ? 1 : (nearby ? .46 : .22),
+                      child: ImageFiltered(
+                        enabled: blur > 0,
+                        imageFilter: ImageFilter.blur(
+                          sigmaX: blur,
+                          sigmaY: blur,
+                        ),
+                        child: TweenAnimationBuilder<double>(
+                          tween: Tween(begin: 0, end: pull),
+                          duration: const Duration(milliseconds: 280),
+                          curve: const _LyricLineTensionCurve(),
+                          builder: (context, animatedPull, child) {
+                            return Transform.translate(
+                              offset: Offset(0, animatedPull),
+                              child: child,
+                            );
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                RepaintBoundary(
+                                  child: _LyricText(
+                                    line: line,
+                                    active: active,
+                                    position: _framePosition,
+                                    reserveActiveLayout: true,
+                                  ),
+                                ),
+                                if (secondaryText != null &&
+                                    secondaryText.isNotEmpty) ...[
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    secondaryText,
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .titleMedium
+                                        ?.copyWith(
+                                          color: Colors.white.withValues(
+                                            alpha: active ? .62 : .38,
+                                          ),
+                                          height: 1.28,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                  ),
+                                ],
+                              ],
                             ),
-                            if (secondaryText != null &&
-                                secondaryText.isNotEmpty) ...[
-                              const SizedBox(height: 8),
-                              Text(
-                                secondaryText,
-                                style: Theme.of(context).textTheme.titleMedium
-                                    ?.copyWith(
-                                      color: Colors.white.withValues(
-                                        alpha: active ? .62 : .38,
-                                      ),
-                                      height: 1.28,
-                                      fontWeight: FontWeight.w700,
-                                    ),
-                              ),
-                            ],
-                          ],
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                );
-              },
-            ),
-        ],
+                  );
+                },
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -1984,6 +2131,7 @@ class _LyricText extends StatelessWidget {
     this.styleOverride,
     this.textAlign = TextAlign.start,
     this.singleLine = false,
+    this.reserveActiveLayout = false,
   });
 
   final LyricLine line;
@@ -1992,9 +2140,14 @@ class _LyricText extends StatelessWidget {
   final TextStyle? styleOverride;
   final TextAlign textAlign;
   final bool singleLine;
+  final bool reserveActiveLayout;
 
   @override
   Widget build(BuildContext context) {
+    if (reserveActiveLayout && !singleLine && styleOverride == null) {
+      return _buildReservedLayoutText(context);
+    }
+
     final style =
         styleOverride ??
         Theme.of(context).textTheme.headlineMedium!.copyWith(
@@ -2065,6 +2218,45 @@ class _LyricText extends StatelessWidget {
           painter: painter,
         );
       },
+    );
+  }
+
+  Widget _buildReservedLayoutText(BuildContext context) {
+    final style = Theme.of(context).textTheme.headlineMedium!.copyWith(
+      color: Colors.white,
+      fontSize: 34,
+      height: 1.24,
+      fontWeight: FontWeight.w900,
+    );
+
+    if (active && line.words.isNotEmpty) {
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          final painter = _KaraokeLinePainter(
+            line: line,
+            position: position,
+            style: style,
+            baseColor: Colors.white.withValues(alpha: .34),
+            activeColor: Colors.white,
+            textDirection: Directionality.of(context),
+            textAlign: textAlign,
+            maxLines: null,
+            maxWidth: constraints.maxWidth,
+          );
+
+          return CustomPaint(
+            size: Size(constraints.maxWidth, painter.height),
+            painter: painter,
+          );
+        },
+      );
+    }
+
+    return Text(
+      line.text,
+      textAlign: textAlign,
+      style: style,
+      overflow: TextOverflow.clip,
     );
   }
 }
