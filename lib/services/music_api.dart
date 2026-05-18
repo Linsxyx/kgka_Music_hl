@@ -98,9 +98,10 @@ class MusicApi {
         )
         .where((item) => item.id.isNotEmpty)
         .toList();
+    final orderedPlaylists = _orderUserPlaylistsForDisplay(playlists);
     _debugPlaylistLogObject(
       'parsed item fields',
-      playlists
+      orderedPlaylists
           .map(
             (item) => {
               'title': item.title,
@@ -121,7 +122,7 @@ class MusicApi {
           )
           .toList(),
     );
-    return playlists;
+    return orderedPlaylists;
   }
 
   Future<List<PlaylistSummary>> recommendedPlaylists({
@@ -553,6 +554,15 @@ class MusicApi {
         asString(value['accessKey']) != null;
     return hasId && hasAccessKey ? value : null;
   }
+}
+
+List<PlaylistSummary> _orderUserPlaylistsForDisplay(
+  List<PlaylistSummary> playlists,
+) {
+  if (playlists.length <= 2) {
+    return playlists;
+  }
+  return [...playlists.take(2), ...playlists.skip(2).toList().reversed];
 }
 
 List<LyricLine> parseLyrics(String? content, {String? translationContent}) {
