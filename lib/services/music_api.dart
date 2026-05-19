@@ -157,8 +157,19 @@ class MusicApi {
     return DailyRecommend.fromJson(json);
   }
 
-  Future<void> dailyVip() async {
-    await _client.get('/youth/day/vip');
+  Future<VipReceiveHistory> vipReceiveHistory() async {
+    final json = asMap(await _client.get('/youth/month/vip/record'));
+    return VipReceiveHistory.fromJson(json);
+  }
+
+  Future<OneDayVipResult> dailyVip() async {
+    final json = asMap(await _client.get('/youth/day/vip'));
+    return OneDayVipResult.fromJson(json);
+  }
+
+  Future<UpgradeVipResult> upgradeVipReward() async {
+    final json = asMap(await _client.get('/youth/day/vip/upgrade'));
+    return UpgradeVipResult.fromJson(json);
   }
 
   Future<void> addListeningTime() async {
