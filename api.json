@@ -5,6 +5,11 @@
     "description": "酷狗音乐API",
     "version": "v1"
   },
+  "servers": [
+    {
+      "url": "https://localhost:7293/"
+    }
+  ],
   "paths": {
     "/album/shop": {
       "get": {
@@ -1749,6 +1754,77 @@
         }
       }
     },
+    "/playlist/external/parse": {
+      "post": {
+        "tags": [
+          "ExternalPlaylist"
+        ],
+        "summary": "解析网易云 / QQ 音乐歌单分享链接，返回歌单名和歌曲名称列表。",
+        "requestBody": {
+          "description": "分享链接或分享文案。",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExternalPlaylistParseRequest"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExternalPlaylistParseRequest"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExternalPlaylistParseRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExternalPlaylistParseResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExternalPlaylistParseResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExternalPlaylistParseResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProblemDetails"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/fm/recommend": {
       "get": {
         "tags": [
@@ -1757,7 +1833,24 @@
         "summary": "电台 - 推荐。",
         "responses": {
           "200": {
-            "description": "推荐电台列表。"
+            "description": "推荐电台列表。",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/FmRecommendResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FmRecommendResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FmRecommendResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -1772,7 +1865,7 @@
           {
             "name": "fmid",
             "in": "query",
-            "description": "fmid，可以传多个。",
+            "description": "fmid。",
             "required": true,
             "schema": {
               "type": "string"
@@ -1795,7 +1888,7 @@
           {
             "name": "offset",
             "in": "query",
-            "description": "fmoffset。",
+            "description": "fmoffset。歌曲列表大小",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -1809,7 +1902,7 @@
           {
             "name": "size",
             "in": "query",
-            "description": "fmsize。",
+            "description": "fmsize。歌曲列表大小",
             "schema": {
               "pattern": "^-?(?:0|[1-9]\\d*)$",
               "type": [
@@ -1823,7 +1916,24 @@
         ],
         "responses": {
           "200": {
-            "description": "电台音乐列表。"
+            "description": "电台音乐列表。",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/FmSongResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FmSongResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FmSongResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -1860,7 +1970,24 @@
         ],
         "responses": {
           "200": {
-            "description": "对应电台的图片。"
+            "description": "对应电台的图片。",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/FmImageResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FmImageResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FmImageResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -5796,6 +5923,96 @@
           }
         }
       }
+    },
+    "/mobile/app/versions": {
+      "get": {
+        "tags": [
+          "ApplicationInfo"
+        ],
+        "summary": "获取所有版本信息，可按平台过滤。",
+        "parameters": [
+          {
+            "name": "platform",
+            "in": "query",
+            "description": "平台，可选值：Android、iOS。",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "版本信息列表。",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AppVersionDto"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AppVersionDto"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AppVersionDto"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/mobile/app/versions/latest": {
+      "get": {
+        "tags": [
+          "ApplicationInfo"
+        ],
+        "summary": "获取指定平台的最新版本信息。",
+        "parameters": [
+          {
+            "name": "platform",
+            "in": "query",
+            "description": "平台，可选值：android、ios。",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "最新版本信息，若未找到则返回 404。",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppVersionDto"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppVersionDto"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AppVersionDto"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -6040,6 +6257,48 @@
           }
         },
         "description": "专辑中的单首歌曲"
+      },
+      "AppVersionDto": {
+        "required": [
+          "platform",
+          "versionName",
+          "versionCode",
+          "updateContent",
+          "downloadUrl",
+          "forceUpdate",
+          "releaseDate"
+        ],
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string"
+          },
+          "versionName": {
+            "type": "string"
+          },
+          "versionCode": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "updateContent": {
+            "type": "string"
+          },
+          "downloadUrl": {
+            "type": "string"
+          },
+          "forceUpdate": {
+            "type": "boolean"
+          },
+          "releaseDate": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "description": "App 版本信息。"
       },
       "ArtistVideoExtra": {
         "type": "object",
@@ -6682,7 +6941,8 @@
         "type": "object",
         "properties": {
           "url": {
-            "type": "string"
+            "type": "string",
+            "description": "评论下的图片（类似表情包？）"
           },
           "width": {
             "pattern": "^-?(?:0|[1-9]\\d*)$",
@@ -7024,6 +7284,505 @@
           }
         },
         "description": "每日推荐单曲信息"
+      },
+      "ExternalPlaylistParseRequest": {
+        "type": "object",
+        "properties": {
+          "sourceText": {
+            "type": "string"
+          }
+        }
+      },
+      "ExternalPlaylistParseResponse": {
+        "type": "object",
+        "properties": {
+          "sourcePlatform": {
+            "type": "string"
+          },
+          "playlistName": {
+            "type": "string"
+          },
+          "songNames": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "FmImageData": {
+        "type": "object",
+        "properties": {
+          "fmid": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "fmtype": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "imgUrl50": {
+            "type": "string"
+          },
+          "imgUrl100": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "封面"
+          },
+          "imgUrl100_size": {
+            "type": "string"
+          }
+        }
+      },
+      "FmImageResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FmImageData"
+            }
+          },
+          "status": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "error_code": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        },
+        "description": "电台图片列表响应数据"
+      },
+      "FmRecommendCategory": {
+        "type": "object",
+        "properties": {
+          "fmid": {
+            "type": "string",
+            "description": "电台 ID"
+          },
+          "fmname": {
+            "type": "string",
+            "description": "电台名称 (例如: 抖音热门歌)"
+          },
+          "classid": {
+            "type": "string",
+            "description": "分类 ID"
+          },
+          "classname": {
+            "type": "string",
+            "description": "分类名称 (例如: 主题, 语言, 风格)"
+          },
+          "description": {
+            "type": "string",
+            "description": "电台描述"
+          },
+          "banner": {
+            "type": "string",
+            "description": "顶部 Banner 封面图"
+          },
+          "imgurl": {
+            "type": "string",
+            "description": "电台 Logo 封面图"
+          },
+          "rcmdlist": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FmRecommendSong"
+            },
+            "description": "推荐歌曲列表 (通常会返回 1 首作为试听/封面辅助)"
+          }
+        },
+        "description": "单个电台频道信息"
+      },
+      "FmRecommendResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FmRecommendCategory"
+            }
+          },
+          "status": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "error_code": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        },
+        "description": "电台 (FM) 推荐响应数据"
+      },
+      "FmRecommendSong": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "歌曲名称 (注意：该接口下通常是 \"歌手 - 歌名\" 的组合形式)"
+          },
+          "hash": {
+            "type": "string",
+            "description": "歌曲 Hash"
+          },
+          "audio_id": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "音频 ID",
+            "format": "int64"
+          },
+          "album_audio_id": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "专辑音频 ID",
+            "format": "int64"
+          },
+          "album_id": {
+            "type": "string",
+            "description": "专辑 ID"
+          },
+          "time": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "播放时长 (毫秒)",
+            "format": "int32"
+          },
+          "privilege": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "权限位 (8/10为VIP, 0为免费等)",
+            "format": "int32"
+          },
+          "trans_param": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "额外转换参数，复用项目中已有的 TransParam 类 (用于获取 union_cover 高清封面)",
+                "$ref": "#/components/schemas/TransParam"
+              }
+            ]
+          }
+        },
+        "description": "电台单曲信息"
+      },
+      "FmSongData": {
+        "type": "object",
+        "properties": {
+          "fmid": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "fmtype": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "offset": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "size": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "songs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FmSongItem"
+            }
+          }
+        }
+      },
+      "FmSongItem": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "hash": {
+            "type": "string"
+          },
+          "320hash": {
+            "type": "string"
+          },
+          "hashflac": {
+            "type": "string"
+          },
+          "hash_high": {
+            "type": "string"
+          },
+          "audio_id": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "album_id": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "album_audio_id": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "time": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "320time": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "size": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "320size": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "filesize_flac": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "privilege": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "vip": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "ext": {
+            "type": "string"
+          },
+          "trans_param": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/FmTransParam"
+              }
+            ]
+          },
+          "tracker_info": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/FmTrackerInfo"
+              }
+            ]
+          },
+          "all_privs": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/JsonElement"
+              }
+            ]
+          },
+          "status": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "error_code": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        }
+      },
+      "FmSongResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FmSongData"
+            }
+          },
+          "status": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "error_code": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        },
+        "description": "FM 歌曲列表响应数据"
+      },
+      "FmTrackerInfo": {
+        "type": "object",
+        "properties": {
+          "auth": {
+            "type": "string"
+          },
+          "module_id": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "open_time": {
+            "type": "string"
+          }
+        }
+      },
+      "FmTransParam": {
+        "type": "object",
+        "properties": {
+          "union_cover": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "封面 (自动处理 {size} 替换为 400)"
+          },
+          "language": {
+            "type": "string"
+          },
+          "is_original": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "cid": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          }
+        }
       },
       "JsonElement": {},
       "LoginResponse": {
@@ -7919,6 +8678,44 @@
           }
         },
         "description": "歌曲播放地址结果。"
+      },
+      "ProblemDetails": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "title": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "status": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "detail": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "instance": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
       },
       "QRCode": {
         "type": "object",
@@ -9469,6 +10266,9 @@
       "name": "Discovery"
     },
     {
+      "name": "ExternalPlaylist"
+    },
+    {
       "name": "Fm"
     },
     {
@@ -9503,6 +10303,9 @@
     },
     {
       "name": "Youth"
+    },
+    {
+      "name": "ApplicationInfo"
     }
   ]
 }

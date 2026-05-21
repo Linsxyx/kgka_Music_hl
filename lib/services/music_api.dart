@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 
 import '../config/app_config.dart';
 import '../core/api_client.dart';
+import '../models/app_version.dart';
 import '../models/music_models.dart';
 
 class MusicApi {
@@ -174,6 +175,15 @@ class MusicApi {
 
   Future<void> addListeningTime() async {
     await _client.post('/listen/timeadd');
+  }
+
+  Future<AppVersionInfo> latestAppVersion(AppUpdatePlatform platform) async {
+    final json = asMap(
+      await _client.get('/mobile/app/versions/latest', {
+        'platform': platform.apiValue,
+      }),
+    );
+    return AppVersionInfo.fromJson(json);
   }
 
   Future<ArtistDetail> artistDetail(String id) async {

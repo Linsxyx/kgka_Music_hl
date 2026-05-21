@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../../controllers/auth_controller.dart';
 import '../../controllers/player_controller.dart';
+import '../../models/app_version.dart';
 import '../../models/music_models.dart';
+import '../../services/app_update_service.dart';
 import '../../services/music_api.dart';
+import '../widgets/app_update_widgets.dart';
 import '../widgets/artwork.dart';
 import '../widgets/now_playing_badge.dart';
 import 'playlist_detail_page.dart';
@@ -29,13 +32,21 @@ class _HomePageState extends State<HomePage> {
   static _HomeData? _cachedData;
 
   late Future<_HomeData> _future;
+  late final AppUpdateService _updateService;
+  AppVersionInfo? _availableUpdate;
   var _sectionIndex = 0;
+  var _updateBannerDismissed = false;
+  var _autoUpdateDialogShown = false;
 
   @override
   void initState() {
     super.initState();
+    _updateService = AppUpdateService(widget.api);
     final cached = _cachedData;
     _future = cached == null ? _load() : Future.value(cached);
+    if (AppUpdateService.isSupportedPlatform) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _checkForUpdates());
+    }
   }
 
   Future<_HomeData> _load() async {
@@ -57,6 +68,48 @@ class _HomePageState extends State<HomePage> {
       _future = future;
     });
     await future;
+  }
+
+  Future<void> _checkForUpdates() async {
+    try {
+      final version = await _updateService.checkForUpdate();
+      if (!mounted || version == null) {
+        return;
+      }
+
+      if (version.forceUpdate) {
+        if (_autoUpdateDialogShown) {
+          return;
+        }
+        _autoUpdateDialogShown = true;
+        await showAppUpdateDialog(
+          context: context,
+          service: _updateService,
+          version: version,
+          force: true,
+        );
+        return;
+      }
+
+      if (!_updateBannerDismissed) {
+        setState(() => _availableUpdate = version);
+      }
+    } catch (_) {
+      // The automatic check should stay quiet; manual checks surface errors.
+    }
+  }
+
+  Future<void> _showUpdateDetails() {
+    final version = _availableUpdate;
+    if (version == null) {
+      return Future.value();
+    }
+    return showAppUpdateDialog(
+      context: context,
+      service: _updateService,
+      version: version,
+      force: false,
+    );
   }
 
   void _openPlaylist(PlaylistSummary playlist) {
@@ -115,6 +168,15 @@ class _HomePageState extends State<HomePage> {
                     },
                     api: widget.api,
                     player: widget.player,
+                    updateVersion: _updateBannerDismissed
+                        ? null
+                        : _availableUpdate,
+                    onUpdateTap: () {
+                      _showUpdateDetails();
+                    },
+                    onUpdateClose: () {
+                      setState(() => _updateBannerDismissed = true);
+                    },
                   ),
                 ),
                 if (_sectionIndex == 1)
@@ -160,6 +222,9 @@ class _RecommendHeader extends StatelessWidget {
     required this.onDailyPlay,
     required this.api,
     required this.player,
+    required this.updateVersion,
+    required this.onUpdateTap,
+    required this.onUpdateClose,
   });
 
   final AuthController auth;
@@ -169,6 +234,9 @@ class _RecommendHeader extends StatelessWidget {
   final VoidCallback onDailyPlay;
   final MusicApi api;
   final PlayerController player;
+  final AppVersionInfo? updateVersion;
+  final VoidCallback onUpdateTap;
+  final VoidCallback onUpdateClose;
 
   @override
   Widget build(BuildContext context) {
@@ -204,6 +272,17 @@ class _RecommendHeader extends StatelessWidget {
                 padding: const EdgeInsets.only(right: 18),
                 child: _SmartSearch(api: api, auth: auth, player: player),
               ),
+              if (updateVersion != null) ...[
+                const SizedBox(height: 10),
+                Padding(
+                  padding: const EdgeInsets.only(right: 18),
+                  child: AppUpdateBanner(
+                    version: updateVersion!,
+                    onTap: onUpdateTap,
+                    onClose: onUpdateClose,
+                  ),
+                ),
+              ],
               const SizedBox(height: 14),
               _FeatureShelf(daily: daily, onDailyPlay: onDailyPlay),
             ],

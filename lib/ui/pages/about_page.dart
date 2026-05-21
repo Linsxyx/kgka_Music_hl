@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
 
 import '../../config/app_config.dart';
+import '../../services/app_update_service.dart';
+import '../../services/music_api.dart';
+import '../widgets/app_update_widgets.dart';
 
 class AboutPage extends StatelessWidget {
-  const AboutPage({super.key});
+  const AboutPage({super.key, required this.api});
+
+  final MusicApi api;
 
   @override
   Widget build(BuildContext context) {
@@ -41,6 +46,15 @@ class AboutPage extends StatelessWidget {
               _InfoRow(label: '服务地址', value: AppConfig.apiBaseUrl),
             ],
           ),
+          if (AppUpdateService.isSupportedPlatform) ...[
+            const SizedBox(height: 18),
+            FilledButton.icon(
+              onPressed: () =>
+                  checkAppUpdateManually(context: context, api: api),
+              icon: const Icon(Icons.system_update_alt_rounded),
+              label: const Text('检查更新'),
+            ),
+          ],
           const SizedBox(height: 18),
           Text(
             '一个专注播放体验的音乐应用。',

@@ -38,7 +38,7 @@ class LibraryPage extends StatelessWidget {
     void openSettings() {
       Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (_) => SettingsPage(auth: auth, player: player),
+          builder: (_) => SettingsPage(api: api, auth: auth, player: player),
         ),
       );
     }

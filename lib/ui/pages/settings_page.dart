@@ -2,11 +2,20 @@ import 'package:flutter/material.dart';
 
 import '../../controllers/auth_controller.dart';
 import '../../controllers/player_controller.dart';
+import '../../services/app_update_service.dart';
+import '../../services/music_api.dart';
+import '../widgets/app_update_widgets.dart';
 import 'about_page.dart';
 
 class SettingsPage extends StatelessWidget {
-  const SettingsPage({super.key, required this.auth, required this.player});
+  const SettingsPage({
+    super.key,
+    required this.api,
+    required this.auth,
+    required this.player,
+  });
 
+  final MusicApi api;
   final AuthController auth;
   final PlayerController player;
 
@@ -84,6 +93,23 @@ class SettingsPage extends StatelessWidget {
           _SettingsGroup(
             title: '应用',
             children: [
+              if (AppUpdateService.isSupportedPlatform) ...[
+                ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 14),
+                  leading: Icon(
+                    Icons.system_update_alt_rounded,
+                    color: colorScheme.primary,
+                  ),
+                  title: const Text('检查更新'),
+                  trailing: Icon(
+                    Icons.chevron_right_rounded,
+                    color: colorScheme.outline,
+                  ),
+                  onTap: () =>
+                      checkAppUpdateManually(context: context, api: api),
+                ),
+                const Divider(height: 1, indent: 54),
+              ],
               ListTile(
                 contentPadding: const EdgeInsets.symmetric(horizontal: 14),
                 leading: Icon(
@@ -96,9 +122,9 @@ class SettingsPage extends StatelessWidget {
                   color: colorScheme.outline,
                 ),
                 onTap: () {
-                  Navigator.of(
-                    context,
-                  ).push(MaterialPageRoute(builder: (_) => const AboutPage()));
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => AboutPage(api: api)),
+                  );
                 },
               ),
             ],
