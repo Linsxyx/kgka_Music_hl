@@ -13,11 +13,12 @@ enum PlaybackMode { playlistLoop, shuffle, singleLoop }
 
 class PlayerController extends ChangeNotifier {
   static const _listenTimeSettingKey = 'settings.add_listening_time_enabled';
+  static const _audioQualitySettingKey = 'settings.audio_quality';
   static const _listenTimeReportInterval = Duration(minutes: 30);
   static const _listenTimeCheckInterval = Duration(minutes: 1);
 
   PlayerController(this._api, this._audioHandler) {
-    unawaited(_restoreListeningTimeSetting());
+    unawaited(_restoreSettings());
     _audioHandler.attachTransportControls(onNext: next, onPrevious: previous);
     _positionSub = audioPlayer.positionStream.listen((value) {
       if (!_isSeeking) {
@@ -84,6 +85,7 @@ class PlayerController extends ChangeNotifier {
   bool isBuffering = false;
   bool isPreparing = false;
   bool addListeningTimeEnabled = true;
+  AudioQuality audioQuality = AudioQuality.standard;
   String? errorMessage;
   int seekRevision = 0;
   bool get isScrubbing => _isScrubbing;
@@ -173,7 +175,7 @@ class PlayerController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final playUrl = await _api.songUrl(song);
+      final playUrl = await _api.songUrl(song, quality: audioQuality);
       if (playUrl.url.isEmpty) {
         throw Exception('这首歌暂时没有可播放地址');
       }
@@ -196,6 +198,25 @@ class PlayerController extends ChangeNotifier {
         isPreparing = false;
         notifyListeners();
       }
+    }
+  }
+
+  Future<void> setAudioQuality(
+    AudioQuality quality, {
+    bool reloadCurrent = false,
+  }) async {
+    final sameQuality = audioQuality == quality;
+    if (sameQuality && !reloadCurrent) {
+      return;
+    }
+
+    audioQuality = quality;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_audioQualitySettingKey, quality.apiValue);
+    notifyListeners();
+
+    if (reloadCurrent && currentSong != null && !sameQuality) {
+      await _reloadCurrentSongForQuality();
     }
   }
 
@@ -317,10 +338,50 @@ class PlayerController extends ChangeNotifier {
     }
   }
 
-  Future<void> _restoreListeningTimeSetting() async {
+  Future<void> _reloadCurrentSongForQuality() async {
+    final song = currentSong;
+    if (song == null) {
+      return;
+    }
+
+    final resumePlayback = isPlaying;
+    final targetPosition = smoothPosition;
+    isPreparing = true;
+    errorMessage = null;
+    notifyListeners();
+
+    try {
+      final playUrl = await _api.songUrl(song, quality: audioQuality);
+      if (playUrl.url.isEmpty) {
+        throw Exception('当前音质暂时没有可播放地址');
+      }
+      await _audioHandler.loadSong(
+        song: song,
+        url: playUrl.url,
+        queueSongs: queue,
+        queueIndex: currentIndex,
+      );
+      if (targetPosition > Duration.zero) {
+        await _audioHandler.seek(_clampPosition(targetPosition));
+      }
+      if (resumePlayback) {
+        await _audioHandler.play();
+      }
+    } catch (error) {
+      errorMessage = error.toString();
+    } finally {
+      isPreparing = false;
+      notifyListeners();
+    }
+  }
+
+  Future<void> _restoreSettings() async {
     final prefs = await SharedPreferences.getInstance();
     addListeningTimeEnabled =
         prefs.getBool(_listenTimeSettingKey) ?? addListeningTimeEnabled;
+    audioQuality = AudioQuality.fromApiValue(
+      prefs.getString(_audioQualitySettingKey),
+    );
     _syncListeningTimeTracker();
     notifyListeners();
   }

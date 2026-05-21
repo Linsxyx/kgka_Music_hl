@@ -20,52 +20,47 @@ class AppUpdateBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(10),
-        onTap: onTap,
-        child: Ink(
-          decoration: BoxDecoration(
-            color: colorScheme.primary.withValues(alpha: .12),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: colorScheme.primary.withValues(alpha: .2),
-            ),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 9, 6, 9),
-            child: Row(
-              children: [
-                Icon(
-                  Icons.system_update_alt_rounded,
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: onTap,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: colorScheme.primary.withValues(alpha: .12),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: colorScheme.primary.withValues(alpha: .2)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 9, 6, 9),
+          child: Row(
+            children: [
+              Icon(
+                Icons.system_update_alt_rounded,
+                color: colorScheme.primary,
+                size: 20,
+              ),
+              const SizedBox(width: 9),
+              Expanded(
+                child: Text(
+                  '检测到新版本：${version.versionName}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.primary,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              IconButton(
+                tooltip: '关闭',
+                visualDensity: VisualDensity.compact,
+                onPressed: onClose,
+                icon: Icon(
+                  Icons.close_rounded,
                   color: colorScheme.primary,
                   size: 20,
                 ),
-                const SizedBox(width: 9),
-                Expanded(
-                  child: Text(
-                    '检测到新版本：${version.versionName}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: colorScheme.primary,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
-                IconButton(
-                  tooltip: '关闭',
-                  visualDensity: VisualDensity.compact,
-                  onPressed: onClose,
-                  icon: Icon(
-                    Icons.close_rounded,
-                    color: colorScheme.primary,
-                    size: 20,
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),

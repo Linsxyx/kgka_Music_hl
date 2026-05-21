@@ -10,6 +10,7 @@ import 'package:flutter/services.dart';
 import '../../controllers/auth_controller.dart';
 import '../../controllers/player_controller.dart';
 import '../../models/music_models.dart';
+import '../widgets/audio_quality_sheet.dart';
 import '../widgets/artwork.dart';
 import '../widgets/song_action_sheets.dart';
 import 'artist_detail_page.dart';
@@ -138,6 +139,29 @@ class _PlayerBody extends StatefulWidget {
   State<_PlayerBody> createState() => _PlayerBodyState();
 }
 
+Future<void> _showAudioQualityPicker(
+  BuildContext context,
+  PlayerController player,
+) async {
+  final quality = await showAudioQualitySheet(
+    context: context,
+    selected: player.audioQuality,
+    title: '切换音质',
+    subtitle: '会重新加载当前歌曲并尽量保持播放进度',
+  );
+  if (quality == null) {
+    return;
+  }
+
+  await player.setAudioQuality(quality, reloadCurrent: true);
+  if (!context.mounted) {
+    return;
+  }
+  ScaffoldMessenger.of(
+    context,
+  ).showSnackBar(SnackBar(content: Text('已切换到 ${quality.label}')));
+}
+
 class _PlayerBodyState extends State<_PlayerBody> {
   final _pageController = PageController();
   var _page = 0;
@@ -178,6 +202,7 @@ class _PlayerBodyState extends State<_PlayerBody> {
                 children: [
                   if (!landscape)
                     _TopBar(
+                      player: widget.player,
                       auth: widget.auth,
                       song: widget.song,
                       onClose: widget.onClose,
@@ -485,6 +510,7 @@ class _LandscapePlayerContent extends StatelessWidget {
           child: Column(
             children: [
               _LandscapeHeader(
+                player: player,
                 auth: auth,
                 song: song,
                 onClose: onClose,
@@ -525,6 +551,7 @@ class _LandscapePlayerContent extends StatelessWidget {
 
 class _LandscapeHeader extends StatelessWidget {
   const _LandscapeHeader({
+    required this.player,
     required this.auth,
     required this.song,
     required this.onClose,
@@ -532,6 +559,7 @@ class _LandscapeHeader extends StatelessWidget {
     required this.onArtistTap,
   });
 
+  final PlayerController player;
   final AuthController auth;
   final Song song;
   final VoidCallback onClose;
@@ -618,6 +646,12 @@ class _LandscapeHeader extends StatelessWidget {
       context: context,
       song: song,
       actions: [
+        SongSheetAction(
+          icon: Icons.high_quality_rounded,
+          title: '音质：${player.audioQuality.label}',
+          subtitle: '切换当前播放音质',
+          onTap: () => _showAudioQualityPicker(context, player),
+        ),
         SongSheetAction(
           icon: Icons.playlist_add_rounded,
           title: '添加到歌单',
@@ -1034,12 +1068,14 @@ class _LandscapeLyricLine extends StatelessWidget {
 
 class _TopBar extends StatelessWidget {
   const _TopBar({
+    required this.player,
     required this.auth,
     required this.song,
     required this.onClose,
     required this.onArtistTap,
   });
 
+  final PlayerController player;
   final AuthController auth;
   final Song song;
   final VoidCallback onClose;
@@ -1117,6 +1153,12 @@ class _TopBar extends StatelessWidget {
       context: context,
       song: song,
       actions: [
+        SongSheetAction(
+          icon: Icons.high_quality_rounded,
+          title: '音质：${player.audioQuality.label}',
+          subtitle: '切换当前播放音质',
+          onTap: () => _showAudioQualityPicker(context, player),
+        ),
         SongSheetAction(
           icon: Icons.playlist_add_rounded,
           title: '添加到歌单',

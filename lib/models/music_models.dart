@@ -19,6 +19,27 @@ class LoginSession {
   }
 }
 
+enum AudioQuality {
+  standard('128', '标准音质', '128K'),
+  high('320', '高品音质', '320K'),
+  lossless('flac', '无损音质', 'FLAC');
+
+  const AudioQuality(this.apiValue, this.label, this.badge);
+
+  final String apiValue;
+  final String label;
+  final String badge;
+
+  static AudioQuality fromApiValue(String? value) {
+    for (final quality in AudioQuality.values) {
+      if (quality.apiValue == value) {
+        return quality;
+      }
+    }
+    return AudioQuality.standard;
+  }
+}
+
 class UserProfile {
   const UserProfile({required this.nickname, this.avatarUrl});
 

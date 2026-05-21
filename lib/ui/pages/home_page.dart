@@ -179,36 +179,34 @@ class _HomePageState extends State<HomePage> {
                     },
                   ),
                 ),
-                SliverVisibility(
-                  visible: _sectionIndex == 1,
-                  maintainState: true,
-                  sliver: SliverToBoxAdapter(
-                    child: _RadioSection(
-                      api: widget.api,
-                      player: widget.player,
-                    ),
-                  ),
-                ),
-                SliverVisibility(
-                  visible: _sectionIndex == 0,
-                  maintainState: true,
-                  sliver: SliverMainAxisGroup(
-                    slivers: [
-                      SliverToBoxAdapter(
-                        child: _SongSection(
-                          title: '母带音质·精选',
-                          songs: data.daily.songs,
-                          onPlay: _playSong,
-                          isLiked: (song) => widget.auth.isLiked(song),
-                          onLikeTap: (song) => widget.auth.toggleLike(song),
-                          auth: widget.auth,
-                          player: widget.player,
+                SliverToBoxAdapter(
+                  child: Column(
+                    children: [
+                      _PersistentTabPane(
+                        visible: _sectionIndex == 0,
+                        child: Column(
+                          children: [
+                            _SongSection(
+                              title: '母带音质·精选',
+                              songs: data.daily.songs,
+                              onPlay: _playSong,
+                              isLiked: (song) => widget.auth.isLiked(song),
+                              onLikeTap: (song) => widget.auth.toggleLike(song),
+                              auth: widget.auth,
+                              player: widget.player,
+                            ),
+                            _PlaylistRail(
+                              playlists: data.playlists,
+                              onTap: _openPlaylist,
+                            ),
+                          ],
                         ),
                       ),
-                      SliverToBoxAdapter(
-                        child: _PlaylistRail(
-                          playlists: data.playlists,
-                          onTap: _openPlaylist,
+                      _PersistentTabPane(
+                        visible: _sectionIndex == 1,
+                        child: _RadioSection(
+                          api: widget.api,
+                          player: widget.player,
                         ),
                       ),
                     ],
@@ -302,6 +300,21 @@ class _RecommendHeader extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _PersistentTabPane extends StatelessWidget {
+  const _PersistentTabPane({required this.visible, required this.child});
+
+  final bool visible;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return TickerMode(
+      enabled: visible,
+      child: Offstage(offstage: !visible, child: child),
     );
   }
 }
@@ -513,10 +526,10 @@ class _FeatureCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(12),
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: onTap,
-      child: Ink(
+      child: DecoratedBox(
         decoration: BoxDecoration(
           gradient: LinearGradient(colors: gradient),
           borderRadius: BorderRadius.circular(12),
@@ -680,18 +693,17 @@ class _HomeSongRow extends StatelessWidget {
     return AnimatedBuilder(
       animation: player,
       builder: (context, _) {
-        final active = player.currentSong?.hash == song.hash;
+        final active =
+            song.hash.isNotEmpty && player.currentSong?.hash == song.hash;
         final activeColor = colorScheme.primary;
-        return InkWell(
-          borderRadius: BorderRadius.circular(14),
+        return GestureDetector(
+          behavior: HitTestBehavior.opaque,
           onTap: () => onPlay(song, queue),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 180),
             padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 8),
             decoration: BoxDecoration(
-              color: active
-                  ? activeColor.withValues(alpha: .08)
-                  : Colors.transparent,
+              color: Colors.transparent,
               borderRadius: BorderRadius.circular(14),
             ),
             child: Row(

@@ -4,6 +4,7 @@ import '../../controllers/auth_controller.dart';
 import '../../controllers/player_controller.dart';
 import '../../services/app_update_service.dart';
 import '../../services/music_api.dart';
+import '../widgets/audio_quality_sheet.dart';
 import '../widgets/app_update_widgets.dart';
 import 'about_page.dart';
 
@@ -74,16 +75,39 @@ class SettingsPage extends StatelessWidget {
               AnimatedBuilder(
                 animation: player,
                 builder: (context, _) {
-                  return SwitchListTile(
-                    value: player.addListeningTimeEnabled,
-                    onChanged: player.setAddListeningTimeEnabled,
-                    secondary: Icon(
-                      Icons.bar_chart_rounded,
-                      color: colorScheme.primary,
-                    ),
-                    title: const Text('增加听歌时长'),
-                    subtitle: const Text('每播放 30 分钟自动同步一次'),
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 14),
+                  return Column(
+                    children: [
+                      ListTile(
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                        ),
+                        leading: Icon(
+                          Icons.high_quality_rounded,
+                          color: colorScheme.primary,
+                        ),
+                        title: const Text('默认音质'),
+                        subtitle: Text(player.audioQuality.label),
+                        trailing: Icon(
+                          Icons.chevron_right_rounded,
+                          color: colorScheme.outline,
+                        ),
+                        onTap: () => _selectDefaultAudioQuality(context),
+                      ),
+                      const Divider(height: 1, indent: 54),
+                      SwitchListTile(
+                        value: player.addListeningTimeEnabled,
+                        onChanged: player.setAddListeningTimeEnabled,
+                        secondary: Icon(
+                          Icons.bar_chart_rounded,
+                          color: colorScheme.primary,
+                        ),
+                        title: const Text('增加听歌时长'),
+                        subtitle: const Text('每播放 30 分钟自动同步一次'),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                        ),
+                      ),
+                    ],
                   );
                 },
               ),
@@ -132,6 +156,19 @@ class SettingsPage extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  Future<void> _selectDefaultAudioQuality(BuildContext context) async {
+    final quality = await showAudioQualitySheet(
+      context: context,
+      selected: player.audioQuality,
+      title: '默认音质',
+      subtitle: '新播放的歌曲会使用这个音质',
+    );
+    if (quality == null) {
+      return;
+    }
+    await player.setAudioQuality(quality);
   }
 
   Future<void> _confirmLogout(BuildContext context) async {
