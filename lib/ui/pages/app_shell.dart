@@ -25,21 +25,29 @@ class AppShell extends StatefulWidget {
 
 class _AppShellState extends State<AppShell> {
   var _index = 0;
+  late final List<Widget> _pages;
+
+  @override
+  void initState() {
+    super.initState();
+    _pages = [
+      HomePage(api: widget.api, auth: widget.auth, player: widget.player),
+      LibraryPage(api: widget.api, auth: widget.auth, player: widget.player),
+    ];
+  }
 
   @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.paddingOf(context).bottom;
     final colorScheme = Theme.of(context).colorScheme;
-    final pages = [
-      HomePage(api: widget.api, auth: widget.auth, player: widget.player),
-      LibraryPage(api: widget.api, auth: widget.auth, player: widget.player),
-    ];
 
     return Scaffold(
       extendBody: true,
       body: Stack(
         children: [
-          Positioned.fill(child: pages[_index]),
+          Positioned.fill(
+            child: IndexedStack(index: _index, children: _pages),
+          ),
           Positioned(
             left: 0,
             right: 0,

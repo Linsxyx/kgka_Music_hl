@@ -31,7 +31,7 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   static _HomeData? _cachedData;
 
-  late Future<_HomeData> _future;
+  Future<_HomeData>? _future;
   late final AppUpdateService _updateService;
   AppVersionInfo? _availableUpdate;
   var _sectionIndex = 0;
@@ -43,10 +43,31 @@ class _HomePageState extends State<HomePage> {
     super.initState();
     _updateService = AppUpdateService(widget.api);
     final cached = _cachedData;
-    _future = cached == null ? _load() : Future.value(cached);
+    if (cached != null) {
+      _future = Future.value(cached);
+    } else if (!widget.auth.isRestoring) {
+      _future = _load();
+    }
+    widget.auth.addListener(_handleAuthChanged);
     if (AppUpdateService.isSupportedPlatform) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _checkForUpdates());
     }
+  }
+
+  @override
+  void dispose() {
+    widget.auth.removeListener(_handleAuthChanged);
+    super.dispose();
+  }
+
+  void _handleAuthChanged() {
+    if (widget.auth.isRestoring || !widget.auth.isLoggedIn || _future != null) {
+      return;
+    }
+
+    setState(() {
+      _future = _load();
+    });
   }
 
   Future<_HomeData> _load() async {
@@ -141,7 +162,8 @@ class _HomePageState extends State<HomePage> {
             physics: const AlwaysScrollableScrollPhysics(),
             slivers: [
               if (data == null &&
-                  snapshot.connectionState == ConnectionState.waiting)
+                  (_future == null ||
+                      snapshot.connectionState == ConnectionState.waiting))
                 const SliverToBoxAdapter(child: _HomeSkeleton())
               else if (data == null && snapshot.hasError)
                 SliverFillRemaining(

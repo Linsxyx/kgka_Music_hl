@@ -86,11 +86,7 @@ class _KaMusicAppState extends State<KaMusicApp> {
       home: AnimatedBuilder(
         animation: _auth,
         builder: (context, _) {
-          if (_auth.isRestoring) {
-            return const _RestoreSessionPage();
-          }
-
-          if (!_auth.isLoggedIn) {
+          if (!_auth.isRestoring && !_auth.isLoggedIn) {
             return LoginPage(auth: _auth);
           }
 
@@ -125,37 +121,6 @@ class _SystemUiOverlay extends StatelessWidget {
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: overlayStyle,
       child: child,
-    );
-  }
-}
-
-class _RestoreSessionPage extends StatelessWidget {
-  const _RestoreSessionPage();
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Scaffold(
-      body: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox.square(
-              dimension: 22,
-              child: CircularProgressIndicator(strokeWidth: 2.4),
-            ),
-            const SizedBox(height: 14),
-            Text(
-              '正在进入',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }
