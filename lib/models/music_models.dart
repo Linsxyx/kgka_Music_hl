@@ -144,6 +144,7 @@ class PlaylistSummary {
     this.type,
     this.source,
     this.listId,
+    this.musiclibId,
   });
 
   final String id;
@@ -168,9 +169,31 @@ class PlaylistSummary {
   /// Raw numeric playlist ID for track add/remove operations
   final String? listId;
 
+  /// Album id for collected albums from `/user/playlist`
+  final String? musiclibId;
+
   bool get isLikedPlaylist => isDefault == 2 || title.trim() == '我喜欢';
 
+  bool get isCollectedAlbum =>
+      !isLikedPlaylist && (sourceGlobalId == null || sourceGlobalId!.isEmpty);
+
+  String? get albumId {
+    if (!isCollectedAlbum) {
+      return null;
+    }
+    if (musiclibId?.isNotEmpty == true) {
+      return musiclibId;
+    }
+    if (sourceListId?.isNotEmpty == true) {
+      return sourceListId;
+    }
+    return null;
+  }
+
   bool get isCreatedPlaylist {
+    if (isCollectedAlbum) {
+      return false;
+    }
     if (type == 0) {
       return true;
     }
@@ -208,8 +231,11 @@ class PlaylistSummary {
     String? currentUserId,
   }) {
     final creatorName = asString(json['list_create_username']);
+    final sourceGlobalId = asString(json['list_create_gid']);
+    final sourceListId = asString(json['list_create_listid']);
     return PlaylistSummary(
       id:
+          sourceGlobalId ??
           asString(json['global_collection_id']) ??
           asString(json['listid']) ??
           '',
@@ -221,11 +247,12 @@ class PlaylistSummary {
       creatorName: creatorName,
       creatorUserId: asString(json['list_create_userid']),
       currentUserId: currentUserId,
-      sourceGlobalId: asString(json['list_create_gid']),
-      sourceListId: asString(json['list_create_listid']),
+      sourceGlobalId: sourceGlobalId,
+      sourceListId: sourceListId,
       type: asInt(json['type']),
       source: asInt(json['source']),
       listId: asString(json['listid']),
+      musiclibId: asString(json['musiclib_id']),
     );
   }
 
@@ -265,6 +292,7 @@ class PlaylistSummary {
       type: asInt(json['type']),
       source: asInt(json['source']),
       listId: asString(json['listId']),
+      musiclibId: asString(json['musiclibId']),
     );
   }
 
@@ -285,6 +313,7 @@ class PlaylistSummary {
       'type': type,
       'source': source,
       'listId': listId,
+      'musiclibId': musiclibId,
     };
   }
 }
@@ -516,6 +545,44 @@ class Song {
           durationFromMilliseconds(json['320time']) ??
           durationFromMilliseconds(json['timelen']) ??
           durationFromMilliseconds(json['timelength']),
+    );
+  }
+
+  factory Song.fromAlbum(Map<String, dynamic> json) {
+    final base = asMap(json['base']);
+    final audioInfo = asMap(json['audio_info']);
+    final albumInfo = asMap(json['album_info']);
+    final authorsRaw = asList(
+      json['authors'],
+    ).whereType<Map<String, dynamic>>();
+    final artists = authorsRaw
+        .map(
+          (item) => ArtistRef(
+            id: asString(item['author_id']) ?? '',
+            name: asString(item['author_name']) ?? '',
+          ),
+        )
+        .where((artist) => artist.name.isNotEmpty)
+        .toList();
+    final artistName = artists.map((artist) => artist.name).join(' / ');
+
+    return Song(
+      id:
+          asString(audioInfo['hash']) ??
+          asString(base['album_id']) ??
+          asString(json['id']) ??
+          '',
+      title: asString(base['audio_name']) ?? '未知歌曲',
+      artist: artistName.isNotEmpty
+          ? artistName
+          : asString(base['author_name']) ?? '未知艺人',
+      hash: asString(audioInfo['hash']) ?? '',
+      albumId: asString(base['album_id']),
+      albumAudioId: asString(audioInfo['hash']) ?? asString(json['id']),
+      albumName: asString(albumInfo['album_name']),
+      coverUrl: normalizeImageUrl(asString(albumInfo['cover'])),
+      artists: artists,
+      duration: durationFromMilliseconds(audioInfo['duration']),
     );
   }
 }

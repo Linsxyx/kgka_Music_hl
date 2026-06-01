@@ -44,6 +44,8 @@ class _PlaylistDetailPageState extends State<PlaylistDetailPage> {
   String? _loadMoreError;
   bool _isMutating = false;
 
+  bool get _isAlbum => widget.playlist.isCollectedAlbum;
+
   @override
   void initState() {
     super.initState();
@@ -67,31 +69,50 @@ class _PlaylistDetailPageState extends State<PlaylistDetailPage> {
       _loadMoreError = null;
       _nextPage = 1;
       _hasMore = true;
+      _info = null;
       _songs.clear();
     });
 
     try {
-      final results = await Future.wait([
-        widget.api.playlistInfo(widget.playlist.id),
-        widget.api.playlistSongs(
-          widget.playlist.id,
+      if (_isAlbum) {
+        final songs = await widget.api.albumSongs(
+          widget.playlist.albumId ?? widget.playlist.id,
           page: 1,
           pageSize: _pageSize,
-        ),
-      ]);
-      if (!mounted) return;
+        );
+        if (!mounted) return;
 
-      final info = results[0] as PlaylistSummary;
-      final songs = results[1] as List<Song>;
-      setState(() {
-        _info = info;
-        _songs.addAll(songs);
-        _nextPage = 2;
-        _hasMore =
-            _songs.length < (info.songCount ?? 1 << 31) &&
-            songs.length == _pageSize;
-        _isInitialLoading = false;
-      });
+        setState(() {
+          _songs.addAll(songs);
+          _nextPage = 2;
+          _hasMore =
+              _songs.length < (widget.playlist.songCount ?? 1 << 31) &&
+              songs.length == _pageSize;
+          _isInitialLoading = false;
+        });
+      } else {
+        final results = await Future.wait([
+          widget.api.playlistInfo(widget.playlist.id),
+          widget.api.playlistSongs(
+            widget.playlist.id,
+            page: 1,
+            pageSize: _pageSize,
+          ),
+        ]);
+        if (!mounted) return;
+
+        final info = results[0] as PlaylistSummary;
+        final songs = results[1] as List<Song>;
+        setState(() {
+          _info = info;
+          _songs.addAll(songs);
+          _nextPage = 2;
+          _hasMore =
+              _songs.length < (info.songCount ?? 1 << 31) &&
+              songs.length == _pageSize;
+          _isInitialLoading = false;
+        });
+      }
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -121,11 +142,17 @@ class _PlaylistDetailPageState extends State<PlaylistDetailPage> {
     });
 
     try {
-      final songs = await widget.api.playlistSongs(
-        widget.playlist.id,
-        page: _nextPage,
-        pageSize: _pageSize,
-      );
+      final songs = _isAlbum
+          ? await widget.api.albumSongs(
+              widget.playlist.albumId ?? widget.playlist.id,
+              page: _nextPage,
+              pageSize: _pageSize,
+            )
+          : await widget.api.playlistSongs(
+              widget.playlist.id,
+              page: _nextPage,
+              pageSize: _pageSize,
+            );
       if (!mounted) return;
 
       setState(() {
@@ -133,7 +160,7 @@ class _PlaylistDetailPageState extends State<PlaylistDetailPage> {
         _nextPage++;
         _hasMore =
             songs.length == _pageSize &&
-            _songs.length < (_info?.songCount ?? 1 << 31);
+            _songs.length < (_currentPlaylist.songCount ?? 1 << 31);
         _isLoadingMore = false;
       });
     } catch (error) {
@@ -156,13 +183,22 @@ class _PlaylistDetailPageState extends State<PlaylistDetailPage> {
   bool get _canEdit => widget.auth.canEditPlaylist(_currentPlaylist);
 
   Future<void> _collectPlaylist() async {
+    if (_isAlbum) return;
     await _runMutation(() => widget.auth.collectPlaylist(_currentPlaylist));
   }
 
   Future<void> _deleteOrUncollectPlaylist() async {
     final target = _libraryPlaylist;
-    final title = target.isCreatedPlaylist ? '删除歌单' : '取消收藏';
-    final message = target.isCreatedPlaylist ? '确定要删除这个歌单吗？' : '确定要取消收藏这个歌单吗？';
+    final title = target.isCollectedAlbum
+        ? '取消收藏专辑'
+        : target.isCreatedPlaylist
+        ? '删除歌单'
+        : '取消收藏';
+    final message = target.isCollectedAlbum
+        ? '确定要取消收藏这个专辑吗？'
+        : target.isCreatedPlaylist
+        ? '确定要删除这个歌单吗？'
+        : '确定要取消收藏这个歌单吗？';
     final confirmed = await _confirm(title: title, message: message);
     if (confirmed != true) return;
 
@@ -275,7 +311,8 @@ class _PlaylistDetailPageState extends State<PlaylistDetailPage> {
                         ),
                       ),
                     )
-                  else if (!_isInLibrary || !_libraryPlaylist.isLikedPlaylist)
+                  else if ((!_isAlbum && !_isInLibrary) ||
+                      (_isInLibrary && !_libraryPlaylist.isLikedPlaylist))
                     PopupMenuButton<_PlaylistAction>(
                       onSelected: (action) {
                         switch (action) {
@@ -286,7 +323,7 @@ class _PlaylistDetailPageState extends State<PlaylistDetailPage> {
                         }
                       },
                       itemBuilder: (context) => [
-                        if (!_isInLibrary)
+                        if (!_isAlbum && !_isInLibrary)
                           const PopupMenuItem(
                             value: _PlaylistAction.collect,
                             child: Text('收藏歌单'),
@@ -295,7 +332,9 @@ class _PlaylistDetailPageState extends State<PlaylistDetailPage> {
                           PopupMenuItem(
                             value: _PlaylistAction.deleteOrUncollect,
                             child: Text(
-                              _libraryPlaylist.isCreatedPlaylist
+                              _libraryPlaylist.isCollectedAlbum
+                                  ? '取消收藏专辑'
+                                  : _libraryPlaylist.isCreatedPlaylist
                                   ? '删除歌单'
                                   : '取消收藏',
                             ),
@@ -313,7 +352,11 @@ class _PlaylistDetailPageState extends State<PlaylistDetailPage> {
               else if (_errorMessage case final message?)
                 SliverFillRemaining(
                   hasScrollBody: false,
-                  child: _DetailError(message: message, onRetry: _loadInitial),
+                  child: _DetailError(
+                    title: _isAlbum ? '专辑加载失败' : '歌单加载失败',
+                    message: message,
+                    onRetry: _loadInitial,
+                  ),
                 )
               else ...[
                 SliverToBoxAdapter(
@@ -432,7 +475,9 @@ class _HeroHeader extends StatelessWidget {
                         ),
                         const SizedBox(height: 6),
                         Text(
-                          info.subtitle ?? _detailMeta(info),
+                          info.subtitle?.trim().isNotEmpty == true
+                              ? info.subtitle!
+                              : _detailMeta(info),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: Theme.of(context).textTheme.bodyMedium
@@ -818,8 +863,13 @@ class _SongRow extends StatelessWidget {
 }
 
 class _DetailError extends StatelessWidget {
-  const _DetailError({required this.message, required this.onRetry});
+  const _DetailError({
+    required this.title,
+    required this.message,
+    required this.onRetry,
+  });
 
+  final String title;
   final String message;
   final VoidCallback onRetry;
 
@@ -832,7 +882,7 @@ class _DetailError extends StatelessWidget {
         children: [
           const Icon(Icons.error_outline_rounded, size: 42),
           const SizedBox(height: 12),
-          Text('歌单加载失败', style: Theme.of(context).textTheme.titleLarge),
+          Text(title, style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 8),
           Text(
             message,
@@ -853,6 +903,12 @@ class _DetailError extends StatelessWidget {
 }
 
 String _detailMeta(PlaylistSummary info) {
+  if (info.isCollectedAlbum) {
+    if (info.songCount != null) {
+      return '${info.songCount} 首歌';
+    }
+    return '收藏的专辑';
+  }
   final parts = <String>[];
   if (info.songCount != null) {
     parts.add('${info.songCount} 首歌');

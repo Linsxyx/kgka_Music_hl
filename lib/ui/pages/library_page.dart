@@ -75,6 +75,13 @@ class LibraryPage extends StatelessWidget {
         builder: (context, _) {
           final createdPlaylists = auth.createdPlaylists;
           final collectedPlaylists = auth.collectedPlaylists;
+          final collectedAlbums = auth.collectedAlbums;
+          final totalPlaylists =
+              createdPlaylists.length +
+              collectedPlaylists.length +
+              (auth.likedPlaylist == null ? 0 : 1);
+          final hasCollections =
+              collectedPlaylists.isNotEmpty || collectedAlbums.isNotEmpty;
 
           return CustomScrollView(
             slivers: [
@@ -88,6 +95,8 @@ class LibraryPage extends StatelessWidget {
               SliverToBoxAdapter(
                 child: _QuickStats(
                   auth: auth,
+                  playlistCount: totalPlaylists,
+                  albumCount: collectedAlbums.length,
                   onLikedTap: auth.likedPlaylist == null
                       ? null
                       : () => openPlaylist(auth.likedPlaylist!),
@@ -107,7 +116,7 @@ class LibraryPage extends StatelessWidget {
                     18,
                     0,
                     18,
-                    collectedPlaylists.isEmpty ? 160 : 20,
+                    hasCollections ? 20 : 160,
                   ),
                   sliver: SliverList.separated(
                     itemCount: createdPlaylists.length,
@@ -129,12 +138,39 @@ class LibraryPage extends StatelessWidget {
                     ),
                   ),
                   SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(18, 0, 18, 160),
+                    padding: EdgeInsets.fromLTRB(
+                      18,
+                      0,
+                      18,
+                      collectedAlbums.isEmpty ? 160 : 20,
+                    ),
                     sliver: SliverList.separated(
                       itemCount: collectedPlaylists.length,
                       separatorBuilder: (_, _) => const SizedBox(height: 8),
                       itemBuilder: (context, index) {
                         final playlist = collectedPlaylists[index];
+                        return _PlaylistRow(
+                          playlist: playlist,
+                          onTap: () => openPlaylist(playlist),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+                if (collectedAlbums.isNotEmpty) ...[
+                  SliverToBoxAdapter(
+                    child: _SectionHeader(
+                      title: '收藏的专辑',
+                      count: collectedAlbums.length,
+                    ),
+                  ),
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(18, 0, 18, 160),
+                    sliver: SliverList.separated(
+                      itemCount: collectedAlbums.length,
+                      separatorBuilder: (_, _) => const SizedBox(height: 8),
+                      itemBuilder: (context, index) {
+                        final playlist = collectedAlbums[index];
                         return _PlaylistRow(
                           playlist: playlist,
                           onTap: () => openPlaylist(playlist),
@@ -312,9 +348,16 @@ class _AccountCard extends StatelessWidget {
 }
 
 class _QuickStats extends StatelessWidget {
-  const _QuickStats({required this.auth, required this.onLikedTap});
+  const _QuickStats({
+    required this.auth,
+    required this.playlistCount,
+    required this.albumCount,
+    required this.onLikedTap,
+  });
 
   final AuthController auth;
+  final int playlistCount;
+  final int albumCount;
   final VoidCallback? onLikedTap;
 
   @override
@@ -327,7 +370,15 @@ class _QuickStats extends StatelessWidget {
             child: _StatTile(
               icon: Icons.queue_music_rounded,
               label: '歌单',
-              value: '${auth.playlists.length}',
+              value: '$playlistCount',
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: _StatTile(
+              icon: Icons.album_rounded,
+              label: '专辑',
+              value: '$albumCount',
             ),
           ),
           const SizedBox(width: 10),
@@ -446,7 +497,7 @@ class _EmptyPlaylists extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.all(18),
           child: Text(
-            '这里会显示你收藏和创建的歌单。',
+            '这里会显示你收藏和创建的歌单、专辑。',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               color: colorScheme.onSurfaceVariant,
             ),
@@ -492,7 +543,8 @@ class _PlaylistRow extends StatelessWidget {
                   const SizedBox(height: 3),
                   Text(
                     playlist.songCount == null
-                        ? (playlist.subtitle ?? '歌单')
+                        ? (playlist.subtitle ??
+                              (playlist.isCollectedAlbum ? '专辑' : '歌单'))
                         : '${playlist.songCount} 首歌',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,

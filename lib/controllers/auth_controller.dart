@@ -81,16 +81,27 @@ class AuthController extends ChangeNotifier {
   }
 
   List<PlaylistSummary> get createdPlaylists {
-    return playlists.where((playlist) => playlist.isCreatedPlaylist).toList();
+    return playlists
+        .where(
+          (playlist) =>
+              !playlist.isCollectedAlbum && playlist.isCreatedPlaylist,
+        )
+        .toList();
   }
 
   List<PlaylistSummary> get collectedPlaylists {
     return playlists
         .where(
           (playlist) =>
-              !playlist.isLikedPlaylist && !playlist.isCreatedPlaylist,
+              !playlist.isLikedPlaylist &&
+              !playlist.isCollectedAlbum &&
+              !playlist.isCreatedPlaylist,
         )
         .toList();
+  }
+
+  List<PlaylistSummary> get collectedAlbums {
+    return playlists.where((playlist) => playlist.isCollectedAlbum).toList();
   }
 
   PlaylistSummary? findUserPlaylist(PlaylistSummary playlist) {
