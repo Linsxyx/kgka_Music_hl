@@ -23,23 +23,117 @@ class ArtistDetailPage extends StatefulWidget {
 }
 
 class _ArtistDetailPageState extends State<ArtistDetailPage> {
-  late final Future<_ArtistDetailData> _future;
+  static const _pageSize = 30;
+
+  final _scrollController = ScrollController();
+  final _songs = <Song>[];
+
+  ArtistDetail? _detail;
+  var _nextPage = 1;
+  var _hasMore = true;
+  var _isInitialLoading = true;
+  var _isLoadingMore = false;
+  String? _errorMessage;
+  String? _loadMoreError;
 
   @override
   void initState() {
     super.initState();
-    _future = _load();
+    _scrollController.addListener(_maybeLoadMore);
+    _loadInitial();
   }
 
-  Future<_ArtistDetailData> _load() async {
-    final results = await Future.wait([
-      widget.api.artistDetail(widget.artist.id),
-      widget.api.artistAudios(widget.artist.id, pageSize: 30, sort: 'hot'),
-    ]);
-    return _ArtistDetailData(
-      detail: results[0] as ArtistDetail,
-      songs: results[1] as List<Song>,
-    );
+  @override
+  void dispose() {
+    _scrollController
+      ..removeListener(_maybeLoadMore)
+      ..dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadInitial() async {
+    setState(() {
+      _detail = null;
+      _songs.clear();
+      _nextPage = 1;
+      _hasMore = true;
+      _isInitialLoading = true;
+      _isLoadingMore = false;
+      _errorMessage = null;
+      _loadMoreError = null;
+    });
+
+    try {
+      final results = await Future.wait([
+        widget.api.artistDetail(widget.artist.id),
+        widget.api.artistAudios(
+          widget.artist.id,
+          page: 1,
+          pageSize: _pageSize,
+          sort: 'hot',
+        ),
+      ]);
+      if (!mounted) return;
+
+      final detail = results[0] as ArtistDetail;
+      final songs = results[1] as List<Song>;
+      setState(() {
+        _detail = detail;
+        _songs.addAll(songs);
+        _nextPage = 2;
+        _hasMore = songs.length == _pageSize;
+        _isInitialLoading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = error.toString();
+        _isInitialLoading = false;
+      });
+    }
+  }
+
+  void _maybeLoadMore() {
+    if (!_scrollController.hasClients || !_hasMore || _isLoadingMore) {
+      return;
+    }
+
+    final position = _scrollController.position;
+    if (position.extentAfter < 520) {
+      _loadMore();
+    }
+  }
+
+  Future<void> _loadMore() async {
+    if (_isLoadingMore || !_hasMore) return;
+
+    setState(() {
+      _isLoadingMore = true;
+      _loadMoreError = null;
+    });
+
+    try {
+      final songs = await widget.api.artistAudios(
+        widget.artist.id,
+        page: _nextPage,
+        pageSize: _pageSize,
+        sort: 'hot',
+      );
+      if (!mounted) return;
+
+      setState(() {
+        _songs.addAll(songs);
+        _nextPage++;
+        _hasMore = songs.length == _pageSize;
+        _isLoadingMore = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _loadMoreError = error.toString();
+        _isLoadingMore = false;
+      });
+    }
   }
 
   @override
@@ -53,92 +147,83 @@ class _ArtistDetailPageState extends State<ArtistDetailPage> {
         scrolledUnderElevation: 0,
         title: const SizedBox.shrink(),
       ),
-      body: FutureBuilder<_ArtistDetailData>(
-        future: _future,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const _ArtistDetailSkeleton();
-          }
-          if (snapshot.hasError) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Text(
-                  snapshot.error.toString(),
-                  textAlign: TextAlign.center,
+      body: CustomScrollView(
+        controller: _scrollController,
+        slivers: [
+          SliverToBoxAdapter(
+            child: _ArtistHeader(detail: _detail, fallback: widget.artist),
+          ),
+          if (_isInitialLoading)
+            const _ArtistDetailSkeleton()
+          else if (_errorMessage case final message?)
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: _ArtistDetailError(
+                message: message,
+                onRetry: _loadInitial,
+              ),
+            )
+          else ...[
+            SliverToBoxAdapter(
+              child: _SongSectionHeader(
+                count: _songs.length,
+                onPlayAll: _songs.isEmpty
+                    ? null
+                    : () => widget.player.playSong(
+                        _songs.first,
+                        queue: List<Song>.of(_songs),
+                      ),
+              ),
+            ),
+            if (_songs.isEmpty)
+              const SliverFillRemaining(
+                hasScrollBody: false,
+                child: _EmptyArtistSongs(),
+              )
+            else ...[
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                sliver: SliverList.separated(
+                  itemCount: _songs.length,
+                  separatorBuilder: (_, _) => const SizedBox(height: 2),
+                  itemBuilder: (context, index) {
+                    final song = _songs[index];
+                    return _ArtistSongRow(
+                      song: song,
+                      player: widget.player,
+                      onTap: () => widget.player.playSong(
+                        song,
+                        queue: List<Song>.of(_songs),
+                      ),
+                    );
+                  },
                 ),
               ),
-            );
-          }
-
-          final data = snapshot.data!;
-          return CustomScrollView(
-            slivers: [
               SliverToBoxAdapter(
-                child: _ArtistHeader(
-                  detail: data.detail,
-                  fallback: widget.artist,
+                child: _ArtistLoadMoreFooter(
+                  hasMore: _hasMore,
+                  isLoading: _isLoadingMore,
+                  errorMessage: _loadMoreError,
+                  onRetry: _loadMore,
                 ),
               ),
-              SliverToBoxAdapter(
-                child: _SongSectionHeader(
-                  count: data.songs.length,
-                  onPlayAll: data.songs.isEmpty
-                      ? null
-                      : () => widget.player.playSong(
-                          data.songs.first,
-                          queue: List<Song>.of(data.songs),
-                        ),
-                ),
-              ),
-              if (data.songs.isEmpty)
-                const SliverFillRemaining(
-                  hasScrollBody: false,
-                  child: _EmptyArtistSongs(),
-                )
-              else
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(12, 0, 12, 26),
-                  sliver: SliverList.separated(
-                    itemCount: data.songs.length,
-                    separatorBuilder: (_, _) => const SizedBox(height: 2),
-                    itemBuilder: (context, index) {
-                      final song = data.songs[index];
-                      return _ArtistSongRow(
-                        song: song,
-                        player: widget.player,
-                        onTap: () => widget.player.playSong(
-                          song,
-                          queue: List<Song>.of(data.songs),
-                        ),
-                      );
-                    },
-                  ),
-                ),
             ],
-          );
-        },
+          ],
+        ],
       ),
     );
   }
 }
 
-class _ArtistDetailData {
-  const _ArtistDetailData({required this.detail, required this.songs});
-
-  final ArtistDetail detail;
-  final List<Song> songs;
-}
-
 class _ArtistHeader extends StatelessWidget {
   const _ArtistHeader({required this.detail, required this.fallback});
 
-  final ArtistDetail detail;
+  final ArtistDetail? detail;
   final ArtistRef fallback;
 
   @override
   Widget build(BuildContext context) {
-    final avatar = detail.avatarUrl ?? fallback.avatarUrl;
+    final avatar = detail?.avatarUrl ?? fallback.avatarUrl;
     final topPadding = MediaQuery.paddingOf(context).top;
 
     return ClipRRect(
@@ -181,7 +266,7 @@ class _ArtistHeader extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    detail.name,
+                    detail?.name ?? fallback.name,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.headlineMedium?.copyWith(
@@ -205,9 +290,9 @@ class _ArtistHeader extends StatelessWidget {
                         vertical: 6,
                       ),
                       child: Text(
-                        detail.birthday?.isNotEmpty == true
-                            ? '生日 ${detail.birthday}'
-                            : '歌手 ID ${detail.id}',
+                        detail?.birthday?.isNotEmpty == true
+                            ? '生日 ${detail!.birthday}'
+                            : '歌手 ID ${detail?.id ?? fallback.id}',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: Colors.white.withValues(alpha: .88),
                           fontWeight: FontWeight.w700,
@@ -405,20 +490,18 @@ class _ArtistDetailSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final topPadding = MediaQuery.paddingOf(context).top;
-
-    return ListView(
-      padding: EdgeInsets.fromLTRB(18, topPadding + 18, 18, 30),
-      children: [
-        const _SkeletonBox(width: double.infinity, height: 286, radius: 28),
-        const SizedBox(height: 24),
-        const _SkeletonBox(width: 110, height: 22, radius: 8),
-        const SizedBox(height: 18),
-        for (var index = 0; index < 8; index++) ...[
-          const _SkeletonSongRow(),
-          const SizedBox(height: 16),
+    return SliverPadding(
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 30),
+      sliver: SliverList.list(
+        children: [
+          const _SkeletonBox(width: 110, height: 22, radius: 8),
+          const SizedBox(height: 18),
+          for (var index = 0; index < 8; index++) ...[
+            const _SkeletonSongRow(),
+            const SizedBox(height: 16),
+          ],
         ],
-      ],
+      ),
     );
   }
 }
@@ -486,6 +569,98 @@ class _EmptyArtistSongs extends StatelessWidget {
           color: colorScheme.onSurfaceVariant,
           fontWeight: FontWeight.w700,
         ),
+      ),
+    );
+  }
+}
+
+class _ArtistLoadMoreFooter extends StatelessWidget {
+  const _ArtistLoadMoreFooter({
+    required this.hasMore,
+    required this.isLoading,
+    required this.errorMessage,
+    required this.onRetry,
+  });
+
+  final bool hasMore;
+  final bool isLoading;
+  final String? errorMessage;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    if (errorMessage != null) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(18, 10, 18, 30),
+        child: Center(
+          child: TextButton.icon(
+            onPressed: onRetry,
+            icon: const Icon(Icons.refresh_rounded),
+            label: const Text('加载失败，点击重试'),
+          ),
+        ),
+      );
+    }
+
+    if (isLoading) {
+      return const Padding(
+        padding: EdgeInsets.fromLTRB(18, 14, 18, 30),
+        child: Center(
+          child: SizedBox.square(
+            dimension: 22,
+            child: CircularProgressIndicator(strokeWidth: 2.4),
+          ),
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(18, 8, 18, 30),
+      child: Center(
+        child: Text(
+          hasMore ? '继续下滑加载更多' : '已加载全部',
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: colorScheme.onSurfaceVariant,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ArtistDetailError extends StatelessWidget {
+  const _ArtistDetailError({required this.message, required this.onRetry});
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(Icons.error_outline_rounded, size: 42),
+          const SizedBox(height: 12),
+          Text('歌手页面加载失败', style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 8),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 16),
+          FilledButton.icon(
+            onPressed: onRetry,
+            icon: const Icon(Icons.refresh_rounded),
+            label: const Text('重试'),
+          ),
+        ],
       ),
     );
   }
