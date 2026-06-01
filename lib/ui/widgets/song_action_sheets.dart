@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../controllers/auth_controller.dart';
+import '../../controllers/player_controller.dart';
 import '../../models/music_models.dart';
 import 'artwork.dart';
 
@@ -183,6 +184,27 @@ Future<void> showAddToPlaylistSheet({
         context,
       ).showSnackBar(SnackBar(content: Text('已添加到 ${picked.title}')));
     }
+  } catch (error) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('添加失败：$error')));
+    }
+  }
+}
+
+Future<void> addSongToQueueWithFeedback({
+  required BuildContext context,
+  required PlayerController player,
+  required Song song,
+}) async {
+  try {
+    final added = await player.addToQueue(song);
+    if (!context.mounted) return;
+
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(added ? '已设为下一首播放' : '当前歌曲已在播放中')));
   } catch (error) {
     if (context.mounted) {
       ScaffoldMessenger.of(

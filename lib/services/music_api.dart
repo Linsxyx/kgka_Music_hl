@@ -282,6 +282,32 @@ class MusicApi {
         .toList();
   }
 
+  Future<List<Song>> albumSongs(
+    String id, {
+    int page = 1,
+    int pageSize = 30,
+  }) async {
+    final raw = await _client.get('/album/songs', {
+      'id': id,
+      'page': page,
+      'pagesize': pageSize,
+    });
+    final json = asMap(raw);
+    final items = raw is List
+        ? raw
+        : asList(
+            json['songs'] ??
+                json['data'] ??
+                json['info'] ??
+                _firstListValue(json),
+          );
+    return items
+        .whereType<Map<String, dynamic>>()
+        .map(Song.fromAlbum)
+        .where((song) => song.hash.isNotEmpty)
+        .toList();
+  }
+
   Object? _firstListValue(Map<String, dynamic> json) {
     for (final value in json.values) {
       if (value is List) {

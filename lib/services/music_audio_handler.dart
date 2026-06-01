@@ -48,6 +48,23 @@ class MusicAudioHandler extends BaseAudioHandler
   }
 
   @override
+  Future<void> updateQueue(List<MediaItem> newQueue) async {
+    queue.add(newQueue);
+  }
+
+  Future<void> setSongQueue({
+    required List<Song> queueSongs,
+    required int queueIndex,
+    Song? currentSong,
+  }) async {
+    _queueIndex = queueIndex < 0 ? 0 : queueIndex;
+    queue.add(queueSongs.map(_mediaItemFor).toList(growable: false));
+    if (currentSong != null) {
+      mediaItem.add(_mediaItemFor(currentSong));
+    }
+  }
+
+  @override
   Future<void> play() async {
     await audioPlayer.play();
   }

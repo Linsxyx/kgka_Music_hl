@@ -363,6 +363,7 @@ class _PlayerBodyState extends State<_PlayerBody> {
       MaterialPageRoute(
         builder: (_) => ArtistDetailPage(
           api: widget.player.api,
+          auth: widget.auth,
           artist: selected!,
           player: widget.player,
         ),
@@ -658,6 +659,15 @@ class _LandscapeHeader extends StatelessWidget {
           title: '音效',
           subtitle: player.audioEffectsLabel,
           onTap: () => showAudioEffectsSheet(context: context, player: player),
+        ),
+        SongSheetAction(
+          icon: Icons.queue_music_rounded,
+          title: '下一首播放',
+          onTap: () => addSongToQueueWithFeedback(
+            context: context,
+            player: player,
+            song: song,
+          ),
         ),
         SongSheetAction(
           icon: Icons.playlist_add_rounded,
@@ -1171,6 +1181,15 @@ class _TopBar extends StatelessWidget {
           title: '音效',
           subtitle: player.audioEffectsLabel,
           onTap: () => showAudioEffectsSheet(context: context, player: player),
+        ),
+        SongSheetAction(
+          icon: Icons.queue_music_rounded,
+          title: '下一首播放',
+          onTap: () => addSongToQueueWithFeedback(
+            context: context,
+            player: player,
+            song: song,
+          ),
         ),
         SongSheetAction(
           icon: Icons.playlist_add_rounded,

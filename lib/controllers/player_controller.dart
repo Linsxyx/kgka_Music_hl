@@ -276,6 +276,44 @@ class PlayerController extends ChangeNotifier {
     }
   }
 
+  Future<bool> addToQueue(Song song) async {
+    final songKey = song.hash.isNotEmpty ? song.hash : song.id;
+    final currentSongKey = currentSong == null
+        ? ''
+        : (currentSong!.hash.isNotEmpty ? currentSong!.hash : currentSong!.id);
+    if (songKey.isNotEmpty && songKey == currentSongKey) {
+      return false;
+    }
+
+    final nextQueue = List<Song>.of(queue);
+    final existingIndex = nextQueue.indexWhere((item) {
+      final itemKey = item.hash.isNotEmpty ? item.hash : item.id;
+      return itemKey.isNotEmpty && itemKey == songKey;
+    });
+    if (existingIndex >= 0) {
+      nextQueue.removeAt(existingIndex);
+    }
+
+    if (nextQueue.isEmpty) {
+      nextQueue.add(song);
+    } else {
+      final index = currentIndex;
+      final insertIndex = index < 0
+          ? 0
+          : (index + 1).clamp(0, nextQueue.length);
+      nextQueue.insert(insertIndex, song);
+    }
+
+    queue = nextQueue;
+    await _audioHandler.setSongQueue(
+      queueSongs: queue,
+      queueIndex: currentIndex,
+      currentSong: currentSong,
+    );
+    notifyListeners();
+    return true;
+  }
+
   Future<void> setAudioQuality(
     AudioQuality quality, {
     bool reloadCurrent = false,

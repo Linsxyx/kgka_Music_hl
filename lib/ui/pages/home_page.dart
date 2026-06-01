@@ -9,6 +9,7 @@ import '../../services/music_api.dart';
 import '../widgets/app_update_widgets.dart';
 import '../widgets/artwork.dart';
 import '../widgets/now_playing_badge.dart';
+import '../widgets/song_action_sheets.dart';
 import 'playlist_detail_page.dart';
 import 'search_page.dart';
 
@@ -681,6 +682,7 @@ class _SongSection extends StatelessWidget {
                   onPlay: onPlay,
                   isLiked: isLiked(song),
                   onLikeTap: () => onLikeTap(song),
+                  auth: auth,
                   player: player,
                 ),
             ],
@@ -698,6 +700,7 @@ class _HomeSongRow extends StatelessWidget {
     required this.onPlay,
     required this.isLiked,
     required this.onLikeTap,
+    required this.auth,
     required this.player,
   });
 
@@ -706,6 +709,7 @@ class _HomeSongRow extends StatelessWidget {
   final void Function(Song song, List<Song> queue) onPlay;
   final bool isLiked;
   final VoidCallback onLikeTap;
+  final AuthController auth;
   final PlayerController player;
 
   @override
@@ -797,6 +801,37 @@ class _HomeSongRow extends StatelessWidget {
                     color: isLiked ? Colors.redAccent : colorScheme.outline,
                     size: 27,
                   ),
+                  visualDensity: VisualDensity.compact,
+                ),
+                IconButton(
+                  tooltip: '更多',
+                  onPressed: () {
+                    showSongActionSheet(
+                      context: context,
+                      song: song,
+                      actions: [
+                        SongSheetAction(
+                          icon: Icons.queue_music_rounded,
+                          title: '下一首播放',
+                          onTap: () => addSongToQueueWithFeedback(
+                            context: context,
+                            player: player,
+                            song: song,
+                          ),
+                        ),
+                        SongSheetAction(
+                          icon: Icons.playlist_add_rounded,
+                          title: '添加到歌单',
+                          onTap: () => showAddToPlaylistSheet(
+                            context: context,
+                            auth: auth,
+                            song: song,
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                  icon: const Icon(Icons.more_horiz_rounded),
                   visualDensity: VisualDensity.compact,
                 ),
               ],

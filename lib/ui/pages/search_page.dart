@@ -8,6 +8,7 @@ import '../../models/music_models.dart';
 import '../../services/music_api.dart';
 import '../widgets/artwork.dart';
 import '../widgets/now_playing_badge.dart';
+import '../widgets/song_action_sheets.dart';
 
 class SearchPage extends StatefulWidget {
   const SearchPage({
@@ -718,6 +719,37 @@ class _SearchResults extends StatelessWidget {
                                 : colorScheme.outline,
                             size: 27,
                           ),
+                          visualDensity: VisualDensity.compact,
+                        ),
+                        IconButton(
+                          tooltip: '更多',
+                          onPressed: () {
+                            showSongActionSheet(
+                              context: context,
+                              song: song,
+                              actions: [
+                                SongSheetAction(
+                                  icon: Icons.queue_music_rounded,
+                                  title: '下一首播放',
+                                  onTap: () => addSongToQueueWithFeedback(
+                                    context: context,
+                                    player: player,
+                                    song: song,
+                                  ),
+                                ),
+                                SongSheetAction(
+                                  icon: Icons.playlist_add_rounded,
+                                  title: '添加到歌单',
+                                  onTap: () => showAddToPlaylistSheet(
+                                    context: context,
+                                    auth: auth,
+                                    song: song,
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
+                          icon: const Icon(Icons.more_horiz_rounded),
                           visualDensity: VisualDensity.compact,
                         ),
                       ],
