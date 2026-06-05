@@ -69,23 +69,29 @@ Future<void> showSongActionSheet({
                 ],
               ),
               const SizedBox(height: 14),
-              Material(
-                color: colorScheme.surfaceContainer,
-                borderRadius: BorderRadius.circular(16),
-                clipBehavior: Clip.antiAlias,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
+              Flexible(
+                child: SingleChildScrollView(
+                  child: Material(
                     color: colorScheme.surfaceContainer,
                     borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Column(
-                    children: [
-                      for (var index = 0; index < actions.length; index++) ...[
-                        _SongActionTile(action: actions[index]),
-                        if (index != actions.length - 1)
-                          const Divider(height: 1, indent: 58),
-                      ],
-                    ],
+                    clipBehavior: Clip.antiAlias,
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: colorScheme.surfaceContainer,
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Column(
+                        children: [
+                          for (var index = 0;
+                              index < actions.length;
+                              index++) ...[
+                            _SongActionTile(action: actions[index]),
+                            if (index != actions.length - 1)
+                              const Divider(height: 1, indent: 58),
+                          ],
+                        ],
+                      ),
+                    ),
                   ),
                 ),
               ),

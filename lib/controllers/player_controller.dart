@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 
+import 'package:audio_session/audio_session.dart';
 import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -28,6 +29,10 @@ class PlayerController extends ChangeNotifier {
   static const _equalizerPresetSettingKey = 'settings.equalizer_preset';
   static const _bassBoostEnabledSettingKey = 'settings.bass_boost_enabled';
   static const _bassBoostStrengthSettingKey = 'settings.bass_boost_strength';
+  static const _audioInterruptionEnabledSettingKey =
+      'settings.audio_interruption_enabled';
+  static const _autoResumeAfterInterruptionSettingKey =
+      'settings.auto_resume_after_interruption';
   static const _listenTimeReportInterval = Duration(minutes: 30);
   static const _listenTimeCheckInterval = Duration(minutes: 1);
   static const _defaultEqualizerLevels = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
@@ -99,6 +104,7 @@ class PlayerController extends ChangeNotifier {
       unawaited(_applyEqualizer());
       unawaited(_applyBassBoost());
     });
+    unawaited(_setupAudioSessionListeners());
   }
 
   final MusicApi _api;
@@ -114,6 +120,8 @@ class PlayerController extends ChangeNotifier {
   late final StreamSubscription<PlayerState> _stateSub;
   late final StreamSubscription<ProcessingState> _processingStateSub;
   late final StreamSubscription<int?> _androidAudioSessionSub;
+  StreamSubscription<AudioInterruptionEvent>? _interruptionSub;
+  StreamSubscription<void>? _becomingNoisySub;
   final Stopwatch _positionClock = Stopwatch();
   final _random = math.Random();
   Timer? _completionFallbackTimer;
@@ -146,6 +154,13 @@ class PlayerController extends ChangeNotifier {
   );
   bool bassBoostEnabled = false;
   double bassBoostStrength = 0.45;
+  bool audioInterruptionEnabled = true;
+  bool autoResumeAfterInterruption = false;
+  Timer? _autoResumeTimer;
+  Duration? sleepTimerRemaining;
+  Timer? _sleepTimer;
+  DateTime? _sleepTimerEnd;
+  bool _sleepFinishCurrentSong = false;
   String? errorMessage;
   int seekRevision = 0;
   int? _androidAudioSessionId;
@@ -494,6 +509,14 @@ class PlayerController extends ChangeNotifier {
     _completedSongHash = currentSong!.hash;
 
     try {
+      if (_sleepFinishCurrentSong) {
+        _sleepFinishCurrentSong = false;
+        sleepTimerRemaining = null;
+        notifyListeners();
+        unawaited(_audioHandler.pause());
+        return;
+      }
+
       if (playbackMode == PlaybackMode.singleLoop) {
         _completedSongHash = null;
         await _audioHandler.seek(Duration.zero);
@@ -574,6 +597,141 @@ class PlayerController extends ChangeNotifier {
     }
   }
 
+  Future<void> _setupAudioSessionListeners() async {
+    try {
+      final session = await AudioSession.instance;
+      await session.configure(const AudioSessionConfiguration.music());
+      _interruptionSub = session.interruptionEventStream.listen((event) {
+        if (event.begin) {
+          if (isPlaying && !audioInterruptionEnabled) {
+            // Interruption started — we want to ignore it, but the system
+            // may have already paused the player. Mark that we should
+            // auto-resume once the interruption ends.
+          }
+        } else {
+          // Interruption ended
+          if (autoResumeAfterInterruption && currentSong != null) {
+            _autoResumeTimer?.cancel();
+            _autoResumeTimer = Timer(
+              const Duration(milliseconds: 500),
+              () {
+                if (!isPlaying && currentSong != null) {
+                  unawaited(_audioHandler.play());
+                }
+              },
+            );
+          }
+        }
+      });
+      _becomingNoisySub = session.becomingNoisyEventStream.listen((_) {
+        if (!audioInterruptionEnabled) {
+          // Ignore headphone disconnect
+          return;
+        }
+        if (autoResumeAfterInterruption && currentSong != null) {
+          _autoResumeTimer?.cancel();
+          _autoResumeTimer = Timer(
+            const Duration(milliseconds: 500),
+            () {
+              if (!isPlaying && currentSong != null) {
+                unawaited(_audioHandler.play());
+              }
+            },
+          );
+        }
+      });
+    } catch (_) {
+      // AudioSession not available on this platform
+    }
+  }
+
+  Future<void> setAudioInterruptionEnabled(bool enabled) async {
+    if (audioInterruptionEnabled == enabled) return;
+    audioInterruptionEnabled = enabled;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_audioInterruptionEnabledSettingKey, enabled);
+    notifyListeners();
+  }
+
+  Future<void> setAutoResumeAfterInterruption(bool enabled) async {
+    if (autoResumeAfterInterruption == enabled) return;
+    autoResumeAfterInterruption = enabled;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_autoResumeAfterInterruptionSettingKey, enabled);
+    notifyListeners();
+  }
+
+  bool get isSleepTimerActive =>
+      sleepTimerRemaining != null && sleepTimerRemaining! > Duration.zero;
+
+  bool get isSleepFinishCurrentSong => _sleepFinishCurrentSong;
+
+  /// Set a sleep timer that pauses playback immediately when it expires.
+  void setSleepTimer(Duration duration) {
+    _sleepFinishCurrentSong = false;
+    _sleepTimer?.cancel();
+    _sleepTimerEnd = DateTime.now().add(duration);
+    sleepTimerRemaining = duration;
+    notifyListeners();
+
+    _sleepTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      final end = _sleepTimerEnd;
+      if (end == null) return;
+      final remaining = end.difference(DateTime.now());
+      if (remaining <= Duration.zero) {
+        _executeSleepTimer();
+      } else {
+        sleepTimerRemaining = remaining;
+        notifyListeners();
+      }
+    });
+  }
+
+  /// Set a sleep timer that finishes the current song, then stops.
+  void setSleepTimerFinishSong(Duration duration) {
+    _sleepFinishCurrentSong = false;
+    _sleepTimer?.cancel();
+    _sleepTimerEnd = DateTime.now().add(duration);
+    sleepTimerRemaining = duration;
+    notifyListeners();
+
+    _sleepTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      final end = _sleepTimerEnd;
+      if (end == null) return;
+      final remaining = end.difference(DateTime.now());
+      if (remaining <= Duration.zero) {
+        _sleepTimer?.cancel();
+        _sleepTimer = null;
+        _sleepTimerEnd = null;
+        _sleepFinishCurrentSong = true;
+        // Keep sleepTimerRemaining showing a "finishing" state
+        notifyListeners();
+      } else {
+        sleepTimerRemaining = remaining;
+        notifyListeners();
+      }
+    });
+  }
+
+  void cancelSleepTimer() {
+    _sleepTimer?.cancel();
+    _sleepTimer = null;
+    _sleepTimerEnd = null;
+    _sleepFinishCurrentSong = false;
+    sleepTimerRemaining = null;
+    notifyListeners();
+  }
+
+  void _executeSleepTimer() {
+    _sleepTimer?.cancel();
+    _sleepTimer = null;
+    _sleepTimerEnd = null;
+    _sleepFinishCurrentSong = false;
+    sleepTimerRemaining = null;
+    notifyListeners();
+    unawaited(_audioHandler.pause());
+  }
+
   Future<void> _restoreSettings() async {
     final prefs = await SharedPreferences.getInstance();
     addListeningTimeEnabled =
@@ -593,6 +751,12 @@ class PlayerController extends ChangeNotifier {
         prefs.getBool(_bassBoostEnabledSettingKey) ?? bassBoostEnabled;
     bassBoostStrength =
         prefs.getDouble(_bassBoostStrengthSettingKey) ?? bassBoostStrength;
+    audioInterruptionEnabled =
+        prefs.getBool(_audioInterruptionEnabledSettingKey) ??
+            audioInterruptionEnabled;
+    autoResumeAfterInterruption =
+        prefs.getBool(_autoResumeAfterInterruptionSettingKey) ??
+            autoResumeAfterInterruption;
     _syncListeningTimeTracker();
     unawaited(_refreshEqualizerConfig());
     unawaited(_applyEqualizer());
@@ -772,11 +936,15 @@ class PlayerController extends ChangeNotifier {
   @override
   void dispose() {
     _pauseListeningTimeTracker();
+    _autoResumeTimer?.cancel();
+    _sleepTimer?.cancel();
     _positionSub.cancel();
     _durationSub.cancel();
     _stateSub.cancel();
     _processingStateSub.cancel();
     _androidAudioSessionSub.cancel();
+    _interruptionSub?.cancel();
+    _becomingNoisySub?.cancel();
     _completionFallbackTimer?.cancel();
     unawaited(
       _audioEffects.configureEqualizer(

@@ -13,6 +13,7 @@ import '../../models/music_models.dart';
 import '../widgets/audio_effects_sheet.dart';
 import '../widgets/audio_quality_sheet.dart';
 import '../widgets/artwork.dart';
+import '../widgets/sleep_timer_sheet.dart';
 import '../widgets/song_action_sheets.dart';
 import 'artist_detail_page.dart';
 import 'comment_page.dart';
@@ -661,19 +662,20 @@ class _LandscapeHeader extends StatelessWidget {
           onTap: () => showAudioEffectsSheet(context: context, player: player),
         ),
         SongSheetAction(
-          icon: Icons.queue_music_rounded,
-          title: '下一首播放',
-          onTap: () => addSongToQueueWithFeedback(
-            context: context,
-            player: player,
-            song: song,
-          ),
-        ),
-        SongSheetAction(
           icon: Icons.playlist_add_rounded,
           title: '添加到歌单',
           onTap: () =>
               showAddToPlaylistSheet(context: context, auth: auth, song: song),
+        ),
+        SongSheetAction(
+          icon: Icons.bedtime_rounded,
+          title: '定时播放',
+          subtitle: player.isSleepTimerActive
+              ? '剩余 ${_formatSleepRemaining(player.sleepTimerRemaining)}'
+              : player.isSleepFinishCurrentSong
+                  ? '播完歌曲后停止'
+                  : null,
+          onTap: () => showSleepTimerSheet(context: context, player: player),
         ),
       ],
     );
@@ -1183,23 +1185,31 @@ class _TopBar extends StatelessWidget {
           onTap: () => showAudioEffectsSheet(context: context, player: player),
         ),
         SongSheetAction(
-          icon: Icons.queue_music_rounded,
-          title: '下一首播放',
-          onTap: () => addSongToQueueWithFeedback(
-            context: context,
-            player: player,
-            song: song,
-          ),
-        ),
-        SongSheetAction(
           icon: Icons.playlist_add_rounded,
           title: '添加到歌单',
           onTap: () =>
               showAddToPlaylistSheet(context: context, auth: auth, song: song),
         ),
+        SongSheetAction(
+          icon: Icons.bedtime_rounded,
+          title: '定时播放',
+          subtitle: player.isSleepTimerActive
+              ? '剩余 ${_formatSleepRemaining(player.sleepTimerRemaining)}'
+              : player.isSleepFinishCurrentSong
+                  ? '播完歌曲后停止'
+                  : null,
+          onTap: () => showSleepTimerSheet(context: context, player: player),
+        ),
       ],
     );
   }
+}
+
+String _formatSleepRemaining(Duration? remaining) {
+  if (remaining == null || remaining <= Duration.zero) return '';
+  final minutes = remaining.inMinutes;
+  final seconds = remaining.inSeconds.remainder(60);
+  return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
 }
 
 class _PosterPlayerPage extends StatefulWidget {

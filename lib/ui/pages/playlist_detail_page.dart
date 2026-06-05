@@ -33,6 +33,7 @@ class _PlaylistDetailPageState extends State<PlaylistDetailPage> {
   static const _pageSize = 50;
 
   final _scrollController = ScrollController();
+  final _searchController = TextEditingController();
   final _songs = <Song>[];
 
   PlaylistSummary? _info;
@@ -43,6 +44,10 @@ class _PlaylistDetailPageState extends State<PlaylistDetailPage> {
   String? _errorMessage;
   String? _loadMoreError;
   bool _isMutating = false;
+  bool _isSearching = false;
+  bool _isLoadingAllSongs = false;
+  bool _allSongsLoaded = false;
+  String _searchQuery = '';
 
   bool get _isAlbum => widget.playlist.isCollectedAlbum;
 
@@ -58,7 +63,55 @@ class _PlaylistDetailPageState extends State<PlaylistDetailPage> {
     _scrollController
       ..removeListener(_maybeLoadMore)
       ..dispose();
+    _searchController.dispose();
     super.dispose();
+  }
+
+  List<Song> get _filteredSongs {
+    if (_searchQuery.isEmpty) return _songs;
+    final q = _searchQuery.toLowerCase();
+    return _songs.where((song) {
+      return song.title.toLowerCase().contains(q) ||
+          song.artist.toLowerCase().contains(q) ||
+          (song.albumName?.toLowerCase().contains(q) ?? false);
+    }).toList();
+  }
+
+  void _toggleSearch() {
+    setState(() {
+      _isSearching = !_isSearching;
+      if (!_isSearching) {
+        _searchQuery = '';
+        _searchController.clear();
+      }
+    });
+    if (_isSearching && !_allSongsLoaded) {
+      _loadAllSongs();
+    }
+  }
+
+  Future<void> _loadAllSongs() async {
+    if (_isLoadingAllSongs || _allSongsLoaded) return;
+    setState(() => _isLoadingAllSongs = true);
+    try {
+      final id = _isAlbum
+          ? (widget.playlist.albumId ?? widget.playlist.id)
+          : widget.playlist.id;
+      final allSongs = _isAlbum
+          ? await widget.api.albumSongs(id, page: 1, pageSize: 5000)
+          : await widget.api.playlistSongs(id, fetchAll: true);
+      if (!mounted) return;
+      setState(() {
+        _songs
+          ..clear()
+          ..addAll(allSongs);
+        _allSongsLoaded = true;
+        _hasMore = false;
+        _isLoadingAllSongs = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _isLoadingAllSongs = false);
+    }
   }
 
   Future<void> _loadInitial() async {
@@ -288,64 +341,102 @@ class _PlaylistDetailPageState extends State<PlaylistDetailPage> {
             slivers: [
               SliverAppBar(
                 pinned: true,
-                stretch: true,
-                expandedHeight: 198,
+                stretch: !_isSearching,
+                expandedHeight: _isSearching ? 0 : 198,
                 surfaceTintColor: Colors.transparent,
-                title: Text(
-                  (_info ?? widget.playlist).title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                actions: [
-                  if (_isMutating)
-                    const Padding(
-                      padding: EdgeInsets.only(right: 16),
-                      child: Center(
-                        child: SizedBox.square(
-                          dimension: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2.2),
+                title: _isSearching
+                    ? TextField(
+                        controller: _searchController,
+                        autofocus: true,
+                        onChanged: (value) =>
+                            setState(() => _searchQuery = value),
+                        decoration: InputDecoration(
+                          hintText: _isLoadingAllSongs
+                              ? '正在加载全部歌曲…'
+                              : '搜索歌曲名或歌手名',
+                          border: InputBorder.none,
+                          hintStyle: TextStyle(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .onSurfaceVariant,
+                          ),
+                        ),
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      )
+                    : Text(
+                        (_info ?? widget.playlist).title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w800,
                         ),
                       ),
-                    )
-                  else if ((!_isAlbum && !_isInLibrary) ||
-                      (_isInLibrary && !_libraryPlaylist.isLikedPlaylist))
-                    PopupMenuButton<_PlaylistAction>(
-                      onSelected: (action) {
-                        switch (action) {
-                          case _PlaylistAction.collect:
-                            _collectPlaylist();
-                          case _PlaylistAction.deleteOrUncollect:
-                            _deleteOrUncollectPlaylist();
-                        }
-                      },
-                      itemBuilder: (context) => [
-                        if (!_isAlbum && !_isInLibrary)
-                          const PopupMenuItem(
-                            value: _PlaylistAction.collect,
-                            child: Text('收藏歌单'),
+                actions: [
+                  if (!_isSearching) ...[
+                    IconButton(
+                      tooltip: '搜索',
+                      onPressed: _toggleSearch,
+                      icon: const Icon(Icons.search_rounded),
+                    ),
+                    if (_isMutating)
+                      const Padding(
+                        padding: EdgeInsets.only(right: 16),
+                        child: Center(
+                          child: SizedBox.square(
+                            dimension: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2.2),
                           ),
-                        if (_isInLibrary && !_libraryPlaylist.isLikedPlaylist)
-                          PopupMenuItem(
-                            value: _PlaylistAction.deleteOrUncollect,
-                            child: Text(
-                              _libraryPlaylist.isCollectedAlbum
-                                  ? '取消收藏专辑'
-                                  : _libraryPlaylist.isCreatedPlaylist
-                                  ? '删除歌单'
-                                  : '取消收藏',
+                        ),
+                      )
+                    else if ((!_isAlbum && !_isInLibrary) ||
+                        (_isInLibrary && !_libraryPlaylist.isLikedPlaylist))
+                      PopupMenuButton<_PlaylistAction>(
+                        onSelected: (action) {
+                          switch (action) {
+                            case _PlaylistAction.collect:
+                              _collectPlaylist();
+                            case _PlaylistAction.deleteOrUncollect:
+                              _deleteOrUncollectPlaylist();
+                          }
+                        },
+                        itemBuilder: (context) => [
+                          if (!_isAlbum && !_isInLibrary)
+                            const PopupMenuItem(
+                              value: _PlaylistAction.collect,
+                              child: Text('收藏歌单'),
                             ),
-                          ),
-                      ],
+                          if (_isInLibrary &&
+                              !_libraryPlaylist.isLikedPlaylist)
+                            PopupMenuItem(
+                              value: _PlaylistAction.deleteOrUncollect,
+                              child: Text(
+                                _libraryPlaylist.isCollectedAlbum
+                                    ? '取消收藏专辑'
+                                    : _libraryPlaylist.isCreatedPlaylist
+                                    ? '删除歌单'
+                                    : '取消收藏',
+                              ),
+                            ),
+                        ],
+                      ),
+                  ] else
+                    IconButton(
+                      tooltip: '关闭搜索',
+                      onPressed: _toggleSearch,
+                      icon: const Icon(Icons.close_rounded),
                     ),
                 ],
-                flexibleSpace: FlexibleSpaceBar(
-                  stretchModes: const [StretchMode.zoomBackground],
-                  background: _HeroHeader(info: _info ?? widget.playlist),
-                ),
+                flexibleSpace: _isSearching
+                    ? null
+                    : FlexibleSpaceBar(
+                        stretchModes: const [StretchMode.zoomBackground],
+                        background:
+                            _HeroHeader(info: _info ?? widget.playlist),
+                      ),
               ),
               if (_isInitialLoading)
                 const _PlaylistDetailSkeleton()
@@ -363,44 +454,70 @@ class _PlaylistDetailPageState extends State<PlaylistDetailPage> {
                   child: _Actions(
                     count: _info?.songCount ?? _songs.length,
                     loadedCount: _songs.length,
-                    onPlay: _songs.isEmpty
+                    onPlay: _filteredSongs.isEmpty
                         ? null
                         : () => widget.player.playSong(
-                            _songs.first,
-                            queue: List<Song>.of(_songs),
+                            _filteredSongs.first,
+                            queue: List<Song>.of(_filteredSongs),
                           ),
+                    searchQuery: _searchQuery,
+                    searchResultCount: _searchQuery.isNotEmpty
+                        ? _filteredSongs.length
+                        : null,
                   ),
                 ),
-                SliverPadding(
-                  padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
-                  sliver: SliverList.separated(
-                    itemCount: _songs.length,
-                    separatorBuilder: (_, _) => const SizedBox(height: 2),
-                    itemBuilder: (context, index) {
-                      final song = _songs[index];
-                      return _SongRow(
-                        song: song,
-                        index: index + 1,
-                        player: widget.player,
-                        canDelete: _canEdit,
-                        onTap: () => widget.player.playSong(
-                          song,
-                          queue: List<Song>.of(_songs),
+                if (_isLoadingAllSongs)
+                  const SliverToBoxAdapter(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(vertical: 40),
+                      child: Center(
+                        child: Column(
+                          children: [
+                            CircularProgressIndicator(strokeWidth: 2.4),
+                            SizedBox(height: 12),
+                            Text('正在加载全部歌曲…'),
+                          ],
                         ),
-                        onAddToPlaylist: () => _addSongToPlaylist(song),
-                        onDelete: () => _removeSong(song),
-                      );
-                    },
+                      ),
+                    ),
+                  )
+                else if (_searchQuery.isNotEmpty && _filteredSongs.isEmpty)
+                  const SliverToBoxAdapter(
+                    child: _SearchEmpty(),
+                  )
+                else ...[
+                  SliverPadding(
+                    padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+                    sliver: SliverList.separated(
+                      itemCount: _filteredSongs.length,
+                      separatorBuilder: (_, _) => const SizedBox(height: 2),
+                      itemBuilder: (context, index) {
+                        final song = _filteredSongs[index];
+                        return _SongRow(
+                          song: song,
+                          index: index + 1,
+                          player: widget.player,
+                          canDelete: _canEdit,
+                          onTap: () => widget.player.playSong(
+                            song,
+                            queue: List<Song>.of(_filteredSongs),
+                          ),
+                          onAddToPlaylist: () => _addSongToPlaylist(song),
+                          onDelete: () => _removeSong(song),
+                        );
+                      },
+                    ),
                   ),
-                ),
-                SliverToBoxAdapter(
-                  child: _LoadMoreFooter(
-                    hasMore: _hasMore,
-                    isLoading: _isLoadingMore,
-                    errorMessage: _loadMoreError,
-                    onRetry: _loadMore,
-                  ),
-                ),
+                  if (_searchQuery.isEmpty)
+                    SliverToBoxAdapter(
+                      child: _LoadMoreFooter(
+                        hasMore: _hasMore,
+                        isLoading: _isLoadingMore,
+                        errorMessage: _loadMoreError,
+                        onRetry: _loadMore,
+                      ),
+                    ),
+                ],
               ],
             ],
           ),
@@ -591,22 +708,29 @@ class _Actions extends StatelessWidget {
     required this.count,
     required this.loadedCount,
     required this.onPlay,
+    this.searchQuery,
+    this.searchResultCount,
   });
 
   final int count;
   final int loadedCount;
   final VoidCallback? onPlay;
+  final String? searchQuery;
+  final int? searchResultCount;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final isSearching = searchQuery != null && searchQuery!.isNotEmpty;
     return Padding(
       padding: const EdgeInsets.fromLTRB(18, 18, 18, 12),
       child: Row(
         children: [
           Expanded(
             child: Text(
-              loadedCount >= count
+              isSearching
+                  ? '搜索结果：$searchResultCount 首'
+                  : loadedCount >= count
                   ? '$count 首歌曲'
                   : '已加载 $loadedCount / $count 首',
               style: Theme.of(context).textTheme.bodyLarge?.copyWith(
@@ -615,13 +739,53 @@ class _Actions extends StatelessWidget {
               ),
             ),
           ),
-          FilledButton.icon(
-            onPressed: onPlay,
-            icon: const Icon(Icons.play_arrow_rounded),
-            label: const Text('播放全部'),
-            style: FilledButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 18),
-              shape: const StadiumBorder(),
+          if (!isSearching)
+            FilledButton.icon(
+              onPressed: onPlay,
+              icon: const Icon(Icons.play_arrow_rounded),
+              label: const Text('播放全部'),
+              style: FilledButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 18),
+                shape: const StadiumBorder(),
+              ),
+            )
+          else if (searchResultCount != null && searchResultCount! > 0)
+            FilledButton.icon(
+              onPressed: onPlay,
+              icon: const Icon(Icons.play_arrow_rounded),
+              label: const Text('播放结果'),
+              style: FilledButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 18),
+                shape: const StadiumBorder(),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SearchEmpty extends StatelessWidget {
+  const _SearchEmpty();
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(18, 40, 18, 160),
+      child: Column(
+        children: [
+          Icon(
+            Icons.search_off_rounded,
+            size: 48,
+            color: colorScheme.onSurfaceVariant.withValues(alpha: .5),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            '没有找到匹配的歌曲',
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ],

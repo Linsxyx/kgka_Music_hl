@@ -9,6 +9,7 @@ import '../widgets/audio_effects_sheet.dart';
 import '../widgets/audio_quality_sheet.dart';
 import '../widgets/app_update_widgets.dart';
 import 'about_page.dart';
+import 'audio_interruption_settings_page.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({
@@ -38,161 +39,129 @@ class SettingsPage extends StatelessWidget {
       ),
       child: Scaffold(
         appBar: AppBar(title: const Text('设置')),
-        body: ListView(
-          padding: const EdgeInsets.fromLTRB(18, 10, 18, 32),
-          children: [
-            _SettingsGroup(
-              title: '账号',
+        body: AnimatedBuilder(
+          animation: Listenable.merge([auth, player]),
+          builder: (context, _) {
+            return ListView(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
               children: [
-                AnimatedBuilder(
-                  animation: auth,
-                  builder: (context, _) {
-                    return ListTile(
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                      ),
-                      leading: Icon(
-                        Icons.sync_rounded,
-                        color: colorScheme.primary,
-                      ),
-                      title: const Text('同步个人信息'),
-                      subtitle: const Text('刷新头像、昵称和歌单数据'),
-                      enabled: !auth.isLoading,
-                      trailing: auth.isLoading
-                          ? const SizedBox.square(
-                              dimension: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2.4,
-                              ),
-                            )
-                          : Icon(
-                              Icons.chevron_right_rounded,
-                              color: colorScheme.outline,
-                            ),
-                      onTap: auth.isLoading ? null : auth.refreshProfile,
-                    );
-                  },
+                // Account section
+                _SectionHeader(title: '账号'),
+                const SizedBox(height: 8),
+                _SettingsCard(
+                  children: [
+                    _SettingsTile(
+                      icon: Icons.sync_rounded,
+                      iconColor: colorScheme.primary,
+                      title: '同步个人信息',
+                      subtitle: '刷新头像、昵称和歌单数据',
+                      loading: auth.isLoading,
+                      onTap:
+                          auth.isLoading ? null : () => auth.refreshProfile(),
+                    ),
+                    _SettingsDivider(),
+                    _SettingsTile(
+                      icon: Icons.logout_rounded,
+                      iconColor: colorScheme.error,
+                      title: '退出登录',
+                      titleColor: colorScheme.error,
+                      onTap: auth.isLoading
+                          ? null
+                          : () => _confirmLogout(context),
+                    ),
+                  ],
                 ),
-                const Divider(height: 1, indent: 54),
-                ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 14),
-                  leading: const Icon(Icons.logout_rounded),
-                  title: const Text('退出登录'),
-                  textColor: colorScheme.error,
-                  iconColor: colorScheme.error,
-                  onTap: auth.isLoading ? null : () => _confirmLogout(context),
-                ),
-              ],
-            ),
-            const SizedBox(height: 18),
-            _SettingsGroup(
-              title: '播放',
-              children: [
-                AnimatedBuilder(
-                  animation: player,
-                  builder: (context, _) {
-                    return Column(
-                      children: [
-                        ListTile(
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                          ),
-                          leading: Icon(
-                            Icons.high_quality_rounded,
-                            color: colorScheme.primary,
-                          ),
-                          title: const Text('默认音质'),
-                          subtitle: Text(player.audioQuality.label),
-                          trailing: Icon(
-                            Icons.chevron_right_rounded,
-                            color: colorScheme.outline,
-                          ),
-                          onTap: () => _selectDefaultAudioQuality(context),
-                        ),
-                        const Divider(height: 1, indent: 54),
-                        ListTile(
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                          ),
-                          leading: Icon(
-                            Icons.graphic_eq_rounded,
-                            color: colorScheme.primary,
-                          ),
-                          title: const Text('音效'),
-                          subtitle: Text(player.audioEffectsLabel),
-                          trailing: Icon(
-                            Icons.chevron_right_rounded,
-                            color: colorScheme.outline,
-                          ),
-                          onTap: () => showAudioEffectsSheet(
-                            context: context,
+                const SizedBox(height: 24),
+                // Playback section
+                _SectionHeader(title: '播放'),
+                const SizedBox(height: 8),
+                _SettingsCard(
+                  children: [
+                    _SettingsTile(
+                      icon: Icons.high_quality_rounded,
+                      iconColor: colorScheme.primary,
+                      title: '默认音质',
+                      subtitle: player.audioQuality.label,
+                      onTap: () => _selectDefaultAudioQuality(context),
+                    ),
+                    _SettingsDivider(),
+                    _SettingsTile(
+                      icon: Icons.graphic_eq_rounded,
+                      iconColor: colorScheme.primary,
+                      title: '音效',
+                      subtitle: player.audioEffectsLabel,
+                      onTap: () => showAudioEffectsSheet(
+                        context: context,
+                        player: player,
+                      ),
+                    ),
+                    _SettingsDivider(),
+                    _SettingsTile(
+                      icon: Icons.block_rounded,
+                      title: '后台打断机制',
+                      subtitle: _audioInterruptionSummary(player),
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => AudioInterruptionSettingsPage(
                             player: player,
                           ),
                         ),
-                        const Divider(height: 1, indent: 54),
-                        SwitchListTile(
-                          value: player.addListeningTimeEnabled,
-                          onChanged: player.setAddListeningTimeEnabled,
-                          secondary: Icon(
-                            Icons.bar_chart_rounded,
-                            color: colorScheme.primary,
-                          ),
-                          title: const Text('增加听歌时长'),
-                          subtitle: const Text('每播放 30 分钟自动同步一次'),
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                          ),
+                      ),
+                    ),
+                    _SettingsDivider(),
+                    _SettingsSwitchTile(
+                      icon: Icons.bar_chart_rounded,
+                      iconColor: colorScheme.primary,
+                      title: '增加听歌时长',
+                      subtitle: '每播放 30 分钟自动同步一次',
+                      value: player.addListeningTimeEnabled,
+                      onChanged: player.setAddListeningTimeEnabled,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                // App section
+                _SectionHeader(title: '应用'),
+                const SizedBox(height: 8),
+                _SettingsCard(
+                  children: [
+                    if (AppUpdateService.isSupportedPlatform) ...[
+                      _SettingsTile(
+                        icon: Icons.system_update_alt_rounded,
+                        iconColor: colorScheme.primary,
+                        title: '检查更新',
+                        onTap: () => checkAppUpdateManually(
+                          context: context,
+                          api: api,
                         ),
-                      ],
-                    );
-                  },
+                      ),
+                      _SettingsDivider(),
+                    ],
+                    _SettingsTile(
+                      icon: Icons.info_outline_rounded,
+                      iconColor: colorScheme.primary,
+                      title: '关于',
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => AboutPage(api: api),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
-            ),
-            const SizedBox(height: 18),
-            _SettingsGroup(
-              title: '应用',
-              children: [
-                if (AppUpdateService.isSupportedPlatform) ...[
-                  ListTile(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 14),
-                    leading: Icon(
-                      Icons.system_update_alt_rounded,
-                      color: colorScheme.primary,
-                    ),
-                    title: const Text('检查更新'),
-                    trailing: Icon(
-                      Icons.chevron_right_rounded,
-                      color: colorScheme.outline,
-                    ),
-                    onTap: () =>
-                        checkAppUpdateManually(context: context, api: api),
-                  ),
-                  const Divider(height: 1, indent: 54),
-                ],
-                ListTile(
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 14),
-                  leading: Icon(
-                    Icons.info_outline_rounded,
-                    color: colorScheme.primary,
-                  ),
-                  title: const Text('关于'),
-                  trailing: Icon(
-                    Icons.chevron_right_rounded,
-                    color: colorScheme.outline,
-                  ),
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(builder: (_) => AboutPage(api: api)),
-                    );
-                  },
-                ),
-              ],
-            ),
-          ],
+            );
+          },
         ),
       ),
     );
+  }
+
+  String _audioInterruptionSummary(PlayerController player) {
+    final parts = <String>[];
+    if (!player.audioInterruptionEnabled) parts.add('已阻止打断');
+    if (player.autoResumeAfterInterruption) parts.add('自动恢复');
+    return parts.isEmpty ? '未开启' : parts.join(' · ');
   }
 
   Future<void> _selectDefaultAudioQuality(BuildContext context) async {
@@ -202,9 +171,7 @@ class SettingsPage extends StatelessWidget {
       title: '默认音质',
       subtitle: '新播放的歌曲会使用这个音质',
     );
-    if (quality == null) {
-      return;
-    }
+    if (quality == null) return;
     await player.setAudioQuality(quality);
   }
 
@@ -229,54 +196,199 @@ class SettingsPage extends StatelessWidget {
       },
     );
 
-    if (confirmed != true || !context.mounted) {
-      return;
-    }
-
+    if (confirmed != true || !context.mounted) return;
     await auth.logout();
-    if (!context.mounted) {
-      return;
-    }
+    if (!context.mounted) return;
     Navigator.of(context).popUntil((route) => route.isFirst);
   }
 }
 
-class _SettingsGroup extends StatelessWidget {
-  const _SettingsGroup({required this.title, required this.children});
+// --- Shared widgets ---
+
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({required this.title});
 
   final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: Text(
+        title,
+        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+          color: Theme.of(context).colorScheme.primary,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 0.8,
+        ),
+      ),
+    );
+  }
+}
+
+class _SettingsCard extends StatelessWidget {
+  const _SettingsCard({required this.children});
+
   final List<Widget> children;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainer,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: Column(children: children),
+      ),
+    );
+  }
+}
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
-          child: Text(
-            title,
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-              color: colorScheme.onSurfaceVariant,
-              fontWeight: FontWeight.w800,
+class _SettingsTile extends StatelessWidget {
+  const _SettingsTile({
+    required this.icon,
+    required this.title,
+    this.iconColor,
+    this.titleColor,
+    this.subtitle,
+    this.loading = false,
+    this.onTap,
+  });
+
+  final IconData icon;
+  final Color? iconColor;
+  final String title;
+  final Color? titleColor;
+  final String? subtitle;
+  final bool loading;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 32,
+              child: loading
+                  ? SizedBox.square(
+                      dimension: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.2,
+                        color: colorScheme.primary,
+                      ),
+                    )
+                  : Icon(icon, size: 22, color: iconColor ?? colorScheme.primary),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                      color: titleColor,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle!,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            if (onTap != null)
+              Icon(
+                Icons.chevron_right_rounded,
+                size: 20,
+                color: colorScheme.outline,
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SettingsSwitchTile extends StatelessWidget {
+  const _SettingsSwitchTile({
+    required this.icon,
+    required this.title,
+    required this.value,
+    required this.onChanged,
+    this.iconColor,
+    this.subtitle,
+  });
+
+  final IconData icon;
+  final Color? iconColor;
+  final String title;
+  final String? subtitle;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 32,
+            child: Icon(icon, size: 22, color: iconColor ?? colorScheme.primary),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                if (subtitle != null) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle!,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
-        ),
-        Material(
-          color: colorScheme.surfaceContainer,
-          borderRadius: BorderRadius.circular(14),
-          clipBehavior: Clip.antiAlias,
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: colorScheme.surfaceContainer,
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Column(children: children),
-          ),
-        ),
-      ],
+          Switch(value: value, onChanged: onChanged),
+        ],
+      ),
+    );
+  }
+}
+
+class _SettingsDivider extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Divider(
+      height: 1,
+      indent: 62,
+      color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: .4),
     );
   }
 }

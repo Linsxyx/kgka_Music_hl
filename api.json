@@ -691,7 +691,24 @@
         ],
         "responses": {
           "200": {
-            "description": "歌手专辑列表。"
+            "description": "歌手专辑列表。",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArtistAlbumResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArtistAlbumResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ArtistAlbumResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -1999,7 +2016,7 @@
         ],
         "summary": "登录。",
         "requestBody": {
-          "description": "手机号和短信验证码。",
+          "description": "手机号、短信验证码，以及多账号登录时要选择的用户 id。",
           "content": {
             "application/json": {
               "schema": {
@@ -2025,17 +2042,17 @@
             "content": {
               "text/plain": {
                 "schema": {
-                  "$ref": "#/components/schemas/LoginResponse"
+                  "$ref": "#/components/schemas/MobileLoginAccountSelectionResponse"
                 }
               },
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/LoginResponse"
+                  "$ref": "#/components/schemas/MobileLoginAccountSelectionResponse"
                 }
               },
               "text/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/LoginResponse"
+                  "$ref": "#/components/schemas/MobileLoginAccountSelectionResponse"
                 }
               }
             }
@@ -5983,7 +6000,7 @@
           {
             "name": "platform",
             "in": "query",
-            "description": "平台，可选值：android、ios。",
+            "description": "平台，可选值：Android、iOS。",
             "required": true,
             "schema": {
               "type": "string"
@@ -6020,25 +6037,25 @@
       "AddSongItem": {
         "type": "object",
         "properties": {
-          "name": {
-            "type": "string"
-          },
           "hash": {
-            "type": "string"
+            "type": "string",
+            "description": "歌曲 Hash"
           },
-          "albumId": {
+          "fileid": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
             "type": [
-              "null",
+              "integer",
               "string"
-            ]
+            ],
+            "description": "歌单内唯一 ID",
+            "format": "int64"
           },
-          "mixSongId": {
-            "type": [
-              "null",
-              "string"
-            ]
+          "name": {
+            "type": "string",
+            "description": "歌曲名称"
           }
-        }
+        },
+        "description": "添加成功的单曲简略信息"
       },
       "AddSongResponse": {
         "type": "object",
@@ -6299,6 +6316,147 @@
           }
         },
         "description": "App 版本信息。"
+      },
+      "ArtistAlbumAuthor": {
+        "type": "object",
+        "properties": {
+          "author_name": {
+            "type": "string"
+          },
+          "author_id": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          }
+        },
+        "description": "歌手专辑作者信息。"
+      },
+      "ArtistAlbumExtra": {
+        "type": "object",
+        "properties": {
+          "page_total": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        },
+        "description": "歌手专辑分页扩展信息。"
+      },
+      "ArtistAlbumItem": {
+        "type": "object",
+        "properties": {
+          "album_id": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "album_name": {
+            "type": "string"
+          },
+          "author_name": {
+            "type": "string"
+          },
+          "cover": {
+            "type": "string"
+          },
+          "sizable_cover": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "authors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ArtistAlbumAuthor"
+            }
+          },
+          "publish_date": {
+            "type": "string"
+          },
+          "intro": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "status": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "error_code": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        },
+        "description": "歌手专辑列表项。"
+      },
+      "ArtistAlbumResponse": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ArtistAlbumItem"
+            }
+          },
+          "extra": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ArtistAlbumExtra"
+              }
+            ]
+          },
+          "status": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "error_code": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        },
+        "description": "歌手专辑列表响应。"
       },
       "ArtistVideoExtra": {
         "type": "object",
@@ -7785,54 +7943,6 @@
         }
       },
       "JsonElement": {},
-      "LoginResponse": {
-        "type": "object",
-        "properties": {
-          "userid": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "null",
-              "integer",
-              "string"
-            ],
-            "description": "用户 ID。",
-            "format": "int64"
-          },
-          "token": {
-            "type": [
-              "null",
-              "string"
-            ],
-            "description": "登录 Token。"
-          },
-          "t1": {
-            "type": [
-              "null",
-              "string"
-            ],
-            "description": "附加登录凭证 `t1`。"
-          },
-          "status": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "null",
-              "integer",
-              "string"
-            ],
-            "format": "int32"
-          },
-          "error_code": {
-            "pattern": "^-?(?:0|[1-9]\\d*)$",
-            "type": [
-              "null",
-              "integer",
-              "string"
-            ],
-            "format": "int32"
-          }
-        },
-        "description": "登录响应数据"
-      },
       "LyricResult": {
         "required": [
           "rawContent",
@@ -7865,6 +7975,92 @@
           }
         }
       },
+      "MobileLoginAccountDto": {
+        "required": [
+          "userId",
+          "nickname",
+          "pic",
+          "appId",
+          "username"
+        ],
+        "type": "object",
+        "properties": {
+          "userId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "nickname": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "pic": {
+            "type": [
+              "null",
+              "string"
+            ]
+          },
+          "appId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "username": {
+            "type": [
+              "null",
+              "string"
+            ]
+          }
+        }
+      },
+      "MobileLoginAccountSelectionResponse": {
+        "required": [
+          "status",
+          "errorCode",
+          "requiresUserSelection",
+          "message",
+          "accounts"
+        ],
+        "type": "object",
+        "properties": {
+          "status": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "errorCode": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "requiresUserSelection": {
+            "type": "boolean"
+          },
+          "message": {
+            "type": "string"
+          },
+          "accounts": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MobileLoginAccountDto"
+            }
+          }
+        }
+      },
       "MobileLoginRequest": {
         "required": [
           "mobile",
@@ -7877,6 +8073,15 @@
           },
           "code": {
             "type": "string"
+          },
+          "userId": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int64"
           }
         }
       },
