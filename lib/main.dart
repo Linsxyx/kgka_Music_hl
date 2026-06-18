@@ -49,7 +49,7 @@ class KaMusicApp extends StatefulWidget {
   State<KaMusicApp> createState() => _KaMusicAppState();
 }
 
-class _KaMusicAppState extends State<KaMusicApp> {
+class _KaMusicAppState extends State<KaMusicApp> with WidgetsBindingObserver {
   late final ApiClient _client;
   late final MusicApi _api;
   late final AuthController _auth;
@@ -58,6 +58,7 @@ class _KaMusicAppState extends State<KaMusicApp> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _client = widget.client;
     _api = widget.api;
     _auth = AuthController(_api);
@@ -67,10 +68,26 @@ class _KaMusicAppState extends State<KaMusicApp> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _auth.dispose();
     _player.dispose();
     _client.close();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (!_player.desktopLyricsEnabled) return;
+    switch (state) {
+      case AppLifecycleState.resumed:
+        _player.setAppForeground(true);
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.paused:
+      case AppLifecycleState.detached:
+      case AppLifecycleState.hidden:
+        _player.setAppForeground(false);
+    }
   }
 
   @override

@@ -18,6 +18,7 @@ import '../widgets/sleep_timer_sheet.dart';
 import '../widgets/song_action_sheets.dart';
 import 'artist_detail_page.dart';
 import 'comment_page.dart';
+import 'desktop_lyrics_settings_page.dart';
 
 class PlayerPage extends StatefulWidget {
   const PlayerPage({super.key, required this.player, required this.auth});
@@ -678,6 +679,29 @@ class _LandscapeHeader extends StatelessWidget {
                   : null,
           onTap: () => showSleepTimerSheet(context: context, player: player),
         ),
+        if (player.isDesktopLyricsSupported) ...[
+          SongSheetAction(
+            icon: player.desktopLyricsEnabled
+                ? Icons.lyrics_rounded
+                : Icons.lyrics_outlined,
+            title: '桌面歌词',
+            subtitle: player.desktopLyricsEnabled ? '已开启' : '已关闭',
+            onTap: () async {
+              Navigator.of(context).pop();
+              await player.setDesktopLyricsEnabled(!player.desktopLyricsEnabled);
+            },
+          ),
+          if (player.desktopLyricsEnabled)
+            SongSheetAction(
+              icon: Icons.tune_rounded,
+              title: '歌词设置',
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => DesktopLyricsSettingsPage(player: player),
+                ),
+              ),
+            ),
+        ],
       ],
     );
   }
@@ -1169,39 +1193,73 @@ class _TopBar extends StatelessWidget {
       context: context,
       song: song,
       actions: [
+        // Grid actions
         SongSheetAction(
           icon: Icons.speed_rounded,
-          title: '倍速播放',
+          title: '倍速',
           subtitle: player.playbackSpeedLabel,
+          isGrid: true,
           onTap: () => showPlaybackSpeedSheet(context: context, player: player),
         ),
         SongSheetAction(
           icon: Icons.high_quality_rounded,
-          title: '音质：${player.audioQuality.label}',
-          subtitle: '切换当前播放音质',
+          title: '音质',
+          subtitle: player.audioQuality.badge,
+          isGrid: true,
           onTap: () => _showAudioQualityPicker(context, player),
         ),
         SongSheetAction(
           icon: Icons.graphic_eq_rounded,
           title: '音效',
-          subtitle: player.audioEffectsLabel,
+          isGrid: true,
           onTap: () => showAudioEffectsSheet(context: context, player: player),
         ),
+        SongSheetAction(
+          icon: Icons.bedtime_rounded,
+          title: '定时',
+          isGrid: true,
+          onTap: () => showSleepTimerSheet(context: context, player: player),
+        ),
+        if (player.isDesktopLyricsSupported) ...[
+          SongSheetAction(
+            icon: player.desktopLyricsEnabled
+                ? Icons.lyrics_rounded
+                : Icons.lyrics_outlined,
+            title: '桌面歌词',
+            isGrid: true,
+            onTap: () async {
+              Navigator.of(context).pop();
+              await player.setDesktopLyricsEnabled(!player.desktopLyricsEnabled);
+            },
+          ),
+          if (player.desktopLyricsEnabled)
+            SongSheetAction(
+              icon: Icons.tune_rounded,
+              title: '歌词设置',
+              isGrid: true,
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => DesktopLyricsSettingsPage(player: player),
+                ),
+              ),
+            ),
+        ],
+        SongSheetAction(
+          icon: Icons.queue_music_rounded,
+          title: '下一首',
+          isGrid: true,
+          onTap: () => addSongToQueueWithFeedback(
+            context: context,
+            player: player,
+            song: song,
+          ),
+        ),
+        // List actions
         SongSheetAction(
           icon: Icons.playlist_add_rounded,
           title: '添加到歌单',
           onTap: () =>
               showAddToPlaylistSheet(context: context, auth: auth, song: song),
-        ),
-        SongSheetAction(
-          icon: Icons.bedtime_rounded,
-          title: '定时播放',
-          subtitle: player.isSleepTimerActive
-              ? '剩余 ${_formatSleepRemaining(player.sleepTimerRemaining)}'
-              : player.isSleepFinishCurrentSong
-                  ? '播完歌曲后停止'
-                  : null,
-          onTap: () => showSleepTimerSheet(context: context, player: player),
         ),
       ],
     );

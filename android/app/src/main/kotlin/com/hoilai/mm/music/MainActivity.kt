@@ -123,6 +123,107 @@ class MainActivity : AudioServiceActivity() {
                     else -> result.notImplemented()
                 }
             }
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "kgka_music_hl/desktop_lyrics")
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "checkPermission" -> {
+                        result.success(Settings.canDrawOverlays(this))
+                    }
+                    "requestPermission" -> {
+                        val intent = Intent(
+                            Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                            Uri.parse("package:$packageName")
+                        )
+                        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        startActivity(intent)
+                        result.success(null)
+                    }
+                    "show" -> {
+                        if (!Settings.canDrawOverlays(this)) {
+                            result.error("no_permission", "No overlay permission", null)
+                            return@setMethodCallHandler
+                        }
+                        val title = call.argument<String>("title") ?: ""
+                        val artist = call.argument<String>("artist") ?: ""
+                        val intent = Intent(this, LyricsOverlayService::class.java).apply {
+                            action = LyricsOverlayService.ACTION_UPDATE_LYRICS
+                            putExtra(LyricsOverlayService.EXTRA_TITLE, title)
+                            putExtra(LyricsOverlayService.EXTRA_ARTIST, artist)
+                            putExtra(LyricsOverlayService.EXTRA_CURRENT_LYRIC, "")
+                            putExtra(LyricsOverlayService.EXTRA_NEXT_LYRIC, "")
+                        }
+                        startService(intent)
+                        result.success(null)
+                    }
+                    "hide" -> {
+                        val intent = Intent(this, LyricsOverlayService::class.java).apply {
+                            action = LyricsOverlayService.ACTION_HIDE
+                        }
+                        startService(intent)
+                        result.success(null)
+                    }
+                    "updateLyrics" -> {
+                        val current = call.argument<String>("current") ?: ""
+                        val next = call.argument<String>("next") ?: ""
+                        val intent = Intent(this, LyricsOverlayService::class.java).apply {
+                            action = LyricsOverlayService.ACTION_UPDATE_LYRICS
+                            putExtra(LyricsOverlayService.EXTRA_CURRENT_LYRIC, current)
+                            putExtra(LyricsOverlayService.EXTRA_NEXT_LYRIC, next)
+                        }
+                        startService(intent)
+                        result.success(null)
+                    }
+                    "updatePlayState" -> {
+                        val isPlaying = call.argument<Boolean>("isPlaying") ?: false
+                        val intent = Intent(this, LyricsOverlayService::class.java).apply {
+                            action = LyricsOverlayService.ACTION_UPDATE_PLAY_STATE
+                            putExtra(LyricsOverlayService.EXTRA_IS_PLAYING, isPlaying)
+                        }
+                        startService(intent)
+                        result.success(null)
+                    }
+                    "isVisible" -> {
+                        result.success(LyricsOverlayService.isRunning(this))
+                    }
+                    "updateKaraokeProgress" -> {
+                        val progress = call.argument<Double>("progress")?.toFloat() ?: 0f
+                        val intent = Intent(this, LyricsOverlayService::class.java).apply {
+                            action = LyricsOverlayService.ACTION_UPDATE_KARAOKE
+                            putExtra(LyricsOverlayService.EXTRA_PROGRESS, progress)
+                        }
+                        startService(intent)
+                        result.success(null)
+                    }
+                    "updateSettings" -> {
+                        val opacity = call.argument<Double>("opacity")?.toFloat() ?: 0.8f
+                        val locked = call.argument<Boolean>("locked") ?: false
+                        val passthrough = call.argument<Boolean>("passthrough") ?: false
+                        val textColorLong = call.argument<Long>("textColor") ?: 0xFFFFFFFF
+                        val fontSize = call.argument<Double>("fontSize")?.toFloat() ?: 16f
+                        val intent = Intent(this, LyricsOverlayService::class.java).apply {
+                            action = LyricsOverlayService.ACTION_UPDATE_SETTINGS
+                            putExtra(LyricsOverlayService.EXTRA_OPACITY, opacity)
+                            putExtra(LyricsOverlayService.EXTRA_LOCKED, locked)
+                            putExtra(LyricsOverlayService.EXTRA_PASSTHROUGH, passthrough)
+                            putExtra(LyricsOverlayService.EXTRA_TEXT_COLOR, textColorLong.toInt())
+                            putExtra(LyricsOverlayService.EXTRA_FONT_SIZE, fontSize)
+                        }
+                        startService(intent)
+                        result.success(null)
+                    }
+                    "setAppForeground" -> {
+                        val isForeground = call.argument<Boolean>("isForeground") ?: false
+                        val intent = Intent(this, LyricsOverlayService::class.java).apply {
+                            action = LyricsOverlayService.ACTION_SET_APP_FOREGROUND
+                            putExtra(LyricsOverlayService.EXTRA_IS_FOREGROUND, isForeground)
+                        }
+                        startService(intent)
+                        result.success(null)
+                    }
+                    else -> result.notImplemented()
+                }
+            }
     }
 
     private fun equalizerConfig(audioSessionId: Int?): Map<String, Any>? {

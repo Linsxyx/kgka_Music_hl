@@ -4,11 +4,13 @@ import 'dart:math' as math;
 
 import 'package:audio_session/audio_session.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/music_models.dart';
 import '../services/audio_effects_service.dart';
+import '../services/desktop_lyrics_service.dart';
 import '../services/music_api.dart';
 import '../services/music_audio_handler.dart';
 
@@ -34,6 +36,8 @@ class PlayerController extends ChangeNotifier {
   static const _autoResumeAfterInterruptionSettingKey =
       'settings.auto_resume_after_interruption';
   static const _playbackSpeedSettingKey = 'settings.playback_speed';
+  static const _desktopLyricsEnabledSettingKey = 'settings.desktop_lyrics_enabled';
+  static const _desktopLyricsSettingsKey = 'settings.desktop_lyrics_settings';
   static const _listenTimeReportInterval = Duration(minutes: 30);
   static const _listenTimeCheckInterval = Duration(minutes: 1);
   static const _defaultEqualizerLevels = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
@@ -73,7 +77,14 @@ class PlayerController extends ChangeNotifier {
         _setPositionBase(value, playing: isPlaying);
       }
       _maybeCompleteFromPosition(value);
+      _maybeSyncDesktopLyricFromPosition();
       notifyListeners();
+    });
+    // Frame-level karaoke sync for smooth 60fps updates
+    SchedulerBinding.instance.addPersistentFrameCallback((_) {
+      if (desktopLyricsEnabled && isPlaying && lyrics.isNotEmpty && !_isScrubbing) {
+        _syncDesktopKaraokeProgress();
+      }
     });
     _durationSub = audioPlayer.durationStream.listen((value) {
       duration = value ?? Duration.zero;
@@ -88,6 +99,7 @@ class PlayerController extends ChangeNotifier {
         _setPositionBase(audioPlayer.position, playing: isPlaying);
       }
       _syncListeningTimeTracker();
+      _syncDesktopPlayState();
       notifyListeners();
     });
     _processingStateSub = audioPlayer.processingStateStream.distinct().listen((
@@ -111,6 +123,7 @@ class PlayerController extends ChangeNotifier {
   final MusicApi _api;
   final MusicAudioHandler _audioHandler;
   final AudioEffectsService _audioEffects = AudioEffectsService();
+  final DesktopLyricsService _desktopLyrics = DesktopLyricsService();
 
   AudioPlayer get audioPlayer => _audioHandler.audioPlayer;
 
@@ -158,6 +171,8 @@ class PlayerController extends ChangeNotifier {
   double bassBoostStrength = 0.45;
   bool audioInterruptionEnabled = true;
   bool autoResumeAfterInterruption = false;
+  bool desktopLyricsEnabled = false;
+  DesktopLyricsSettings desktopLyricsSettings = const DesktopLyricsSettings();
   Timer? _autoResumeTimer;
   Duration? sleepTimerRemaining;
   Timer? _sleepTimer;
@@ -271,7 +286,11 @@ class PlayerController extends ChangeNotifier {
       this.queue = [song];
     }
     lyrics = const [];
+    _lastDesktopLyricIndex = -1;
     notifyListeners();
+    if (desktopLyricsEnabled) {
+      unawaited(_desktopLyrics.show(title: song.title, artist: song.artist));
+    }
 
     try {
       final playUrl = await _api.songUrl(song, quality: audioQuality);
@@ -463,6 +482,7 @@ class PlayerController extends ChangeNotifier {
       lyrics = const [];
       notifyListeners();
     }
+    _syncDesktopLyrics();
   }
 
   Future<void> togglePlay() async {
@@ -682,6 +702,114 @@ class PlayerController extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> setDesktopLyricsEnabled(bool enabled) async {
+    if (desktopLyricsEnabled == enabled) return;
+    desktopLyricsEnabled = enabled;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_desktopLyricsEnabledSettingKey, enabled);
+    notifyListeners();
+
+    if (enabled) {
+      final song = currentSong;
+      if (song != null) {
+        final hasPermission = await _desktopLyrics.checkPermission();
+        if (!hasPermission) {
+          desktopLyricsEnabled = false;
+          await prefs.setBool(_desktopLyricsEnabledSettingKey, false);
+          notifyListeners();
+          await _desktopLyrics.requestPermission();
+          return;
+        }
+        await _desktopLyrics.show(title: song.title, artist: song.artist);
+        _syncDesktopLyrics();
+      }
+    } else {
+      await _desktopLyrics.hide();
+    }
+  }
+
+  void _syncDesktopLyrics() {
+    if (!desktopLyricsEnabled) return;
+    final index = activeLyricIndex;
+    if (lyrics.isEmpty) {
+      _desktopLyrics.updateLyrics(current: '', next: '');
+      return;
+    }
+    final current = lyrics[index.clamp(0, lyrics.length - 1)].text;
+    final nextIndex = index + 1;
+    final next = nextIndex < lyrics.length ? lyrics[nextIndex].text : '';
+    _desktopLyrics.updateLyrics(current: current, next: next);
+  }
+
+  void _syncDesktopPlayState() {
+    if (!desktopLyricsEnabled) return;
+    _desktopLyrics.updatePlayState(isPlaying: isPlaying);
+  }
+
+  int _lastDesktopLyricIndex = -1;
+
+  void _maybeSyncDesktopLyricFromPosition() {
+    if (!desktopLyricsEnabled || lyrics.isEmpty) return;
+    final index = activeLyricIndex;
+    if (index != _lastDesktopLyricIndex) {
+      _lastDesktopLyricIndex = index;
+      _syncDesktopLyrics();
+    }
+    // Karaoke progress for current line
+    _syncDesktopKaraokeProgress();
+  }
+
+  void _syncDesktopKaraokeProgress() {
+    if (!desktopLyricsEnabled || lyrics.isEmpty) return;
+    final index = activeLyricIndex;
+    final line = lyrics[index.clamp(0, lyrics.length - 1)];
+    final position = smoothPosition;
+
+    if (line.words.isEmpty) {
+      // No word-level data: estimate progress from line duration
+      final lineStart = line.time.inMilliseconds;
+      final lineDuration = line.duration?.inMilliseconds ?? 0;
+      if (lineDuration > 0) {
+        final elapsed = position.inMilliseconds - lineStart;
+        final progress = (elapsed / lineDuration).clamp(0.0, 1.0);
+        _desktopLyrics.updateKaraokeProgress(progress: progress);
+      } else {
+        _desktopLyrics.updateKaraokeProgress(progress: 1.0);
+      }
+    } else {
+      // Word-level: find active word and compute progress
+      final lineStart = line.time.inMilliseconds;
+      final lineDuration = line.duration?.inMilliseconds ?? 0;
+      if (lineDuration > 0) {
+        final elapsed = position.inMilliseconds - lineStart;
+        final progress = (elapsed / lineDuration).clamp(0.0, 1.0);
+        _desktopLyrics.updateKaraokeProgress(progress: progress);
+      }
+    }
+  }
+
+  Future<void> updateDesktopLyricsSettings(DesktopLyricsSettings settings) async {
+    desktopLyricsSettings = settings;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_desktopLyricsSettingsKey, jsonEncode(settings.toMap()));
+    notifyListeners();
+    await _desktopLyrics.updateSettings(settings);
+  }
+
+  bool get isDesktopLyricsSupported => DesktopLyricsService.isSupportedPlatform;
+
+  void setAppForeground(bool isForeground) {
+    if (desktopLyricsEnabled) {
+      _desktopLyrics.setAppForeground(isForeground: isForeground);
+    }
+  }
+
+  Future<bool> checkDesktopLyricsPermission() =>
+      _desktopLyrics.checkPermission();
+
+  Future<void> requestDesktopLyricsPermission() =>
+      _desktopLyrics.requestPermission();
+
   bool get isSleepTimerActive =>
       sleepTimerRemaining != null && sleepTimerRemaining! > Duration.zero;
 
@@ -780,7 +908,21 @@ class PlayerController extends ChangeNotifier {
             autoResumeAfterInterruption;
     playbackSpeed =
         prefs.getDouble(_playbackSpeedSettingKey) ?? playbackSpeed;
+    desktopLyricsEnabled =
+        prefs.getBool(_desktopLyricsEnabledSettingKey) ?? desktopLyricsEnabled;
+    final dlSettingsRaw = prefs.getString(_desktopLyricsSettingsKey);
+    if (dlSettingsRaw != null && dlSettingsRaw.isNotEmpty) {
+      try {
+        final map = jsonDecode(dlSettingsRaw);
+        if (map is Map<String, dynamic>) {
+          desktopLyricsSettings = DesktopLyricsSettings.fromMap(map);
+        }
+      } catch (_) {}
+    }
     unawaited(audioPlayer.setSpeed(playbackSpeed));
+    if (desktopLyricsEnabled) {
+      unawaited(_desktopLyrics.updateSettings(desktopLyricsSettings));
+    }
     _syncListeningTimeTracker();
     unawaited(_refreshEqualizerConfig());
     unawaited(_applyEqualizer());
@@ -988,6 +1130,7 @@ class PlayerController extends ChangeNotifier {
     );
     _audioHandler.detachTransportControls();
     unawaited(_audioHandler.close());
+    unawaited(_desktopLyrics.hide());
     super.dispose();
   }
 

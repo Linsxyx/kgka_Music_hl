@@ -11,6 +11,7 @@ import '../widgets/audio_quality_sheet.dart';
 import '../widgets/app_update_widgets.dart';
 import 'about_page.dart';
 import 'audio_interruption_settings_page.dart';
+import 'desktop_lyrics_settings_page.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({
@@ -118,6 +119,38 @@ class SettingsPage extends StatelessWidget {
                       value: player.addListeningTimeEnabled,
                       onChanged: player.setAddListeningTimeEnabled,
                     ),
+                    if (player.isDesktopLyricsSupported) ...[
+                      _SettingsDivider(),
+                      _SettingsSwitchTile(
+                        icon: Icons.lyrics_rounded,
+                        iconColor: colorScheme.primary,
+                        title: '桌面歌词',
+                        subtitle: '在其他应用上方显示歌词悬浮窗',
+                        value: player.desktopLyricsEnabled,
+                        onChanged: (value) async {
+                          await player.setDesktopLyricsEnabled(value);
+                          if (context.mounted && !player.desktopLyricsEnabled && value) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('需要悬浮窗权限才能使用桌面歌词')),
+                            );
+                          }
+                        },
+                      ),
+                      if (player.desktopLyricsEnabled) ...[
+                        _SettingsDivider(),
+                        _SettingsTile(
+                          icon: Icons.tune_rounded,
+                          iconColor: colorScheme.primary,
+                          title: '歌词设置',
+                          subtitle: '透明度、颜色、锁定位置等',
+                          onTap: () => Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => DesktopLyricsSettingsPage(player: player),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                   ],
                 ),
                 const SizedBox(height: 24),

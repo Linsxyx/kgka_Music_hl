@@ -13,6 +13,7 @@ class SongSheetAction {
     required this.title,
     this.subtitle,
     this.danger = false,
+    this.isGrid = false,
     required this.onTap,
   });
 
@@ -20,6 +21,7 @@ class SongSheetAction {
   final String title;
   final String? subtitle;
   final bool danger;
+  final bool isGrid;
   final FutureOr<void> Function() onTap;
 }
 
@@ -28,6 +30,9 @@ Future<void> showSongActionSheet({
   required Song song,
   required List<SongSheetAction> actions,
 }) {
+  final gridActions = actions.where((a) => a.isGrid).toList();
+  final listActions = actions.where((a) => !a.isGrid).toList();
+
   return showModalBottomSheet<void>(
     context: context,
     showDragHandle: true,
@@ -40,6 +45,7 @@ Future<void> showSongActionSheet({
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              // Song info
               Row(
                 children: [
                   Artwork(url: song.coverUrl, size: 52, borderRadius: 10),
@@ -68,39 +74,125 @@ Future<void> showSongActionSheet({
                   ),
                 ],
               ),
-              const SizedBox(height: 14),
-              Flexible(
-                child: SingleChildScrollView(
-                  child: Material(
-                    color: colorScheme.surfaceContainer,
-                    borderRadius: BorderRadius.circular(16),
-                    clipBehavior: Clip.antiAlias,
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: colorScheme.surfaceContainer,
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Column(
-                        children: [
-                          for (var index = 0;
-                              index < actions.length;
-                              index++) ...[
-                            _SongActionTile(action: actions[index]),
-                            if (index != actions.length - 1)
-                              const Divider(height: 1, indent: 58),
-                          ],
-                        ],
-                      ),
-                    ),
+              // Actions card (grid + list in one unified card)
+              if (gridActions.isNotEmpty || listActions.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                Material(
+                  color: colorScheme.surfaceContainer,
+                  borderRadius: BorderRadius.circular(16),
+                  clipBehavior: Clip.antiAlias,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Grid actions (icon + text, 3-column grid)
+                      if (gridActions.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(
+                            vertical: 10,
+                            horizontal: 12,
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              for (var row = 0;
+                                  row * 3 < gridActions.length;
+                                  row++)
+                                Row(
+                                  children: [
+                                    for (var col = 0; col < 3; col++)
+                                      Expanded(
+                                        child: row * 3 + col < gridActions.length
+                                            ? _GridItem(
+                                                action: gridActions[row * 3 + col],
+                                              )
+                                            : const SizedBox.shrink(),
+                                      ),
+                                  ],
+                                ),
+                            ],
+                          ),
+                        ),
+                      // Divider between grid and list
+                      if (gridActions.isNotEmpty && listActions.isNotEmpty)
+                        const Divider(height: 1, indent: 16, endIndent: 16),
+                      // List actions
+                      for (var index = 0;
+                          index < listActions.length;
+                          index++) ...[
+                        _SongActionTile(action: listActions[index]),
+                        if (index != listActions.length - 1)
+                          const Divider(height: 1, indent: 58),
+                      ],
+                    ],
                   ),
                 ),
-              ),
+              ],
             ],
           ),
         ),
       );
     },
   );
+}
+
+class _GridItem extends StatelessWidget {
+  const _GridItem({required this.action});
+
+  final SongSheetAction action;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final color = action.danger ? colorScheme.error : colorScheme.onSurface;
+
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () {
+        Navigator.of(context).pop();
+        Future<void>.delayed(
+          const Duration(milliseconds: 120),
+          () => action.onTap(),
+        );
+      },
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceContainerHighest.withValues(alpha: .6),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(action.icon, color: color, size: 21),
+          ),
+          const SizedBox(height: 5),
+          Text(
+            action.title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: color,
+              fontWeight: FontWeight.w600,
+                fontSize: 11,
+              ),
+            ),
+            if (action.subtitle != null)
+              Text(
+                action.subtitle!,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                  fontSize: 9,
+                ),
+              ),
+          ],
+        ),
+    );
+  }
 }
 
 Future<void> showAddToPlaylistSheet({

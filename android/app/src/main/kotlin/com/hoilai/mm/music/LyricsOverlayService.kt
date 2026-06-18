@@ -1,0 +1,412 @@
+package com.hoilai.mm.music
+
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.app.Service
+import android.content.Context
+import android.content.Intent
+import android.graphics.Color
+import android.graphics.PixelFormat
+import android.os.Build
+import android.os.IBinder
+import android.view.LayoutInflater
+import android.view.MotionEvent
+import android.view.View
+import android.view.Gravity
+import android.view.WindowManager
+import android.widget.ImageView
+import android.widget.TextView
+import kotlin.math.abs
+
+class LyricsOverlayService : Service() {
+
+    companion object {
+        const val CHANNEL_ID = "kgka_music_hl.lyrics_overlay"
+        const val NOTIFICATION_ID = 9001
+
+        const val ACTION_UPDATE_LYRICS = "com.hoilai.mm.music.UPDATE_LYRICS"
+        const val ACTION_UPDATE_PLAY_STATE = "com.hoilai.mm.music.UPDATE_PLAY_STATE"
+        const val ACTION_HIDE = "com.hoilai.mm.music.HIDE_LYRICS"
+        const val ACTION_UPDATE_KARAOKE = "com.hoilai.mm.music.UPDATE_KARAOKE"
+        const val ACTION_UPDATE_SETTINGS = "com.hoilai.mm.music.UPDATE_SETTINGS"
+        const val ACTION_SET_APP_FOREGROUND = "com.hoilai.mm.music.SET_APP_FOREGROUND"
+
+        const val EXTRA_CURRENT_LYRIC = "current_lyric"
+        const val EXTRA_NEXT_LYRIC = "next_lyric"
+        const val EXTRA_IS_PLAYING = "is_playing"
+        const val EXTRA_TITLE = "title"
+        const val EXTRA_ARTIST = "artist"
+        const val EXTRA_PROGRESS = "progress"
+        const val EXTRA_OPACITY = "opacity"
+        const val EXTRA_LOCKED = "locked"
+        const val EXTRA_PASSTHROUGH = "passthrough"
+        const val EXTRA_TEXT_COLOR = "text_color"
+        const val EXTRA_FONT_SIZE = "font_size"
+        const val EXTRA_IS_FOREGROUND = "is_foreground"
+
+        private const val PREFS_NAME = "lyrics_overlay_prefs"
+        private const val KEY_POS_X = "pos_x"
+        private const val KEY_POS_Y = "pos_y"
+        private const val KEY_OPACITY = "opacity"
+        private const val KEY_LOCKED = "locked"
+        private const val KEY_PASSTHROUGH = "passthrough"
+        private const val KEY_TEXT_COLOR = "text_color"
+        private const val KEY_FONT_SIZE = "font_size"
+
+        fun isRunning(context: Context): Boolean {
+            val manager = context.getSystemService(Context.ACTIVITY_SERVICE) as android.app.ActivityManager
+            @Suppress("DEPRECATION")
+            for (service in manager.getRunningServices(Int.MAX_VALUE)) {
+                if (LyricsOverlayService::class.java.name == service.service.className) {
+                    return true
+                }
+            }
+            return false
+        }
+    }
+
+    private var windowManager: WindowManager? = null
+    private var overlayView: View? = null
+    private var karaokeView: KaraokeTextView? = null
+    private var tvNextLyric: TextView? = null
+    private var btnClose: ImageView? = null
+    private var btnLock: ImageView? = null
+    private var layoutParams: WindowManager.LayoutParams? = null
+    private var isShowing = false
+    private var isAppForeground = false
+
+    // Settings
+    private var bgOpacity: Float = 0.8f
+    private var isLocked: Boolean = false
+    private var isPassthrough: Boolean = false
+    private var textColor: Int = Color.WHITE
+    private var fontSizeSp: Float = 16f
+
+    override fun onBind(intent: Intent?): IBinder? = null
+
+    override fun onCreate() {
+        super.onCreate()
+        loadSettings()
+        createNotificationChannel()
+        startForeground(NOTIFICATION_ID, buildNotification())
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        when (intent?.action) {
+            ACTION_UPDATE_LYRICS -> {
+                val current = intent.getStringExtra(EXTRA_CURRENT_LYRIC) ?: ""
+                val next = intent.getStringExtra(EXTRA_NEXT_LYRIC) ?: ""
+                val title = intent.getStringExtra(EXTRA_TITLE) ?: ""
+                val artist = intent.getStringExtra(EXTRA_ARTIST) ?: ""
+                if (!isShowing && !isAppForeground) {
+                    showOverlay(title, artist)
+                }
+                updateLyrics(current, next)
+            }
+            ACTION_UPDATE_PLAY_STATE -> {
+                val isPlaying = intent.getBooleanExtra(EXTRA_IS_PLAYING, false)
+                updatePlayState(isPlaying)
+            }
+            ACTION_HIDE -> {
+                hideOverlay()
+                stopSelf()
+            }
+            ACTION_UPDATE_KARAOKE -> {
+                val progress = intent.getFloatExtra(EXTRA_PROGRESS, 0f)
+                updateKaraokeProgress(progress)
+            }
+            ACTION_UPDATE_SETTINGS -> {
+                bgOpacity = intent.getFloatExtra(EXTRA_OPACITY, bgOpacity)
+                isLocked = intent.getBooleanExtra(EXTRA_LOCKED, isLocked)
+                // Lock auto-enables passthrough
+                isPassthrough = if (isLocked) true else intent.getBooleanExtra(EXTRA_PASSTHROUGH, isPassthrough)
+                val colorInt = intent.getIntExtra(EXTRA_TEXT_COLOR, textColor)
+                val sizeSp = intent.getFloatExtra(EXTRA_FONT_SIZE, fontSizeSp)
+                textColor = colorInt
+                fontSizeSp = sizeSp
+                saveSettings()
+                applySettings()
+            }
+            ACTION_SET_APP_FOREGROUND -> {
+                isAppForeground = intent.getBooleanExtra(EXTRA_IS_FOREGROUND, false)
+                if (isAppForeground) {
+                    hideOverlay()
+                }
+            }
+        }
+        return START_STICKY
+    }
+
+    private fun showOverlay(title: String, artist: String) {
+        if (isShowing) return
+
+        windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
+
+        val inflater = LayoutInflater.from(this)
+        overlayView = inflater.inflate(R.layout.overlay_lyrics, null)
+
+        karaokeView = overlayView?.findViewById(R.id.tv_current_lyric)
+        tvNextLyric = overlayView?.findViewById(R.id.tv_next_lyric)
+        btnClose = overlayView?.findViewById(R.id.btn_close)
+        btnLock = overlayView?.findViewById(R.id.btn_lock)
+
+        btnClose?.setOnClickListener {
+            hideOverlay()
+            stopSelf()
+        }
+
+        btnLock?.setOnClickListener {
+            // Toggle lock from overlay
+            isLocked = !isLocked
+            isPassthrough = isLocked // Lock auto-enables passthrough
+            saveSettings()
+            applySettings()
+            // Notify Flutter side
+            notifySettingsChanged()
+        }
+
+        applySettings()
+
+        layoutParams = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+            else
+                @Suppress("DEPRECATION")
+                WindowManager.LayoutParams.TYPE_PHONE,
+            buildWindowFlags(),
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+            val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+            x = prefs.getInt(KEY_POS_X, 50)
+            y = prefs.getInt(KEY_POS_Y, 100)
+        }
+
+        setupDragListener(overlayView!!, layoutParams!!)
+
+        try {
+            windowManager?.addView(overlayView, layoutParams)
+            isShowing = true
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun buildWindowFlags(): Int {
+        var flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+            WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
+        if (isPassthrough) {
+            flags = flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+        }
+        return flags
+    }
+
+    private fun setupDragListener(view: View, lp: WindowManager.LayoutParams) {
+        var initialX = 0
+        var initialY = 0
+        var initialTouchX = 0f
+        var initialTouchY = 0f
+        var isDragging = false
+
+        view.setOnTouchListener { _, event ->
+            if (isPassthrough) return@setOnTouchListener false
+            when (event.action) {
+                MotionEvent.ACTION_DOWN -> {
+                    initialX = lp.x
+                    initialY = lp.y
+                    initialTouchX = event.rawX
+                    initialTouchY = event.rawY
+                    isDragging = false
+                    true
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    if (isLocked) return@setOnTouchListener false
+                    val dx = event.rawX - initialTouchX
+                    val dy = event.rawY - initialTouchY
+                    if (!isDragging && (abs(dx) > 10 || abs(dy) > 10)) {
+                        isDragging = true
+                    }
+                    if (isDragging) {
+                        lp.x = initialX + dx.toInt()
+                        lp.y = initialY + dy.toInt()
+                        try {
+                            windowManager?.updateViewLayout(view, lp)
+                        } catch (_: Exception) {}
+                    }
+                    true
+                }
+                MotionEvent.ACTION_UP -> {
+                    if (isDragging) {
+                        getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+                            .edit()
+                            .putInt(KEY_POS_X, lp.x)
+                            .putInt(KEY_POS_Y, lp.y)
+                            .apply()
+                    }
+                    isDragging
+                }
+                else -> false
+            }
+        }
+    }
+
+    private fun updateLyrics(current: String, next: String) {
+        karaokeView?.post {
+            karaokeView?.text = if (current.isEmpty()) "暂无歌词" else current
+            karaokeView?.progress = 0f
+            tvNextLyric?.text = next
+            tvNextLyric?.visibility = if (next.isEmpty()) View.GONE else View.VISIBLE
+        }
+    }
+
+    private fun updateKaraokeProgress(progress: Float) {
+        karaokeView?.post {
+            karaokeView?.progress = progress
+        }
+    }
+
+    private fun updatePlayState(isPlaying: Boolean) {
+        // Could dim the overlay when paused if desired
+    }
+
+    private fun applySettings() {
+        overlayView?.post {
+            // Background opacity
+            overlayView?.background?.let { bg ->
+                bg.alpha = (bgOpacity * 255).toInt().coerceIn(0, 255)
+            }
+
+            // Text color
+            karaokeView?.activeColor = textColor
+            karaokeView?.baseColor = Color.argb(
+                90,
+                Color.red(textColor),
+                Color.green(textColor),
+                Color.blue(textColor)
+            )
+            karaokeView?.textSizeSp = fontSizeSp
+
+            // Next lyric color (slightly dimmer)
+            val dimAlpha = (Color.alpha(textColor) * 0.5f).toInt().coerceIn(0, 255)
+            tvNextLyric?.setTextColor(Color.argb(
+                dimAlpha,
+                Color.red(textColor),
+                Color.green(textColor),
+                Color.blue(textColor)
+            ))
+
+            // Lock state: hide buttons when locked (compact mode)
+            if (isLocked) {
+                btnClose?.visibility = View.GONE
+                btnLock?.visibility = View.VISIBLE
+                btnLock?.setImageResource(android.R.drawable.ic_lock_idle_lock)
+                btnLock?.alpha = 0.4f
+            } else {
+                btnClose?.visibility = View.VISIBLE
+                btnLock?.visibility = View.VISIBLE
+                btnLock?.setImageResource(android.R.drawable.ic_lock_lock)
+
+                btnLock?.alpha = 0.7f
+            }
+
+            // Touch flags
+            if (isShowing) {
+                layoutParams?.let { lp ->
+                    lp.flags = buildWindowFlags()
+                    try {
+                        windowManager?.updateViewLayout(overlayView, lp)
+                    } catch (_: Exception) {}
+                }
+            }
+        }
+    }
+
+    private fun notifySettingsChanged() {
+        // Broadcast settings change so Flutter side can update its state
+        val intent = Intent("com.hoilai.mm.music.LYRICS_SETTINGS_CHANGED")
+        intent.putExtra(EXTRA_LOCKED, isLocked)
+        intent.putExtra(EXTRA_PASSTHROUGH, isPassthrough)
+        intent.setPackage(packageName)
+        sendBroadcast(intent)
+    }
+
+    private fun loadSettings() {
+        val prefs = getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+        bgOpacity = prefs.getFloat(KEY_OPACITY, 0.8f)
+        isLocked = prefs.getBoolean(KEY_LOCKED, false)
+        isPassthrough = if (isLocked) true else prefs.getBoolean(KEY_PASSTHROUGH, false)
+        textColor = prefs.getInt(KEY_TEXT_COLOR, Color.WHITE)
+        fontSizeSp = prefs.getFloat(KEY_FONT_SIZE, 16f)
+    }
+
+    private fun saveSettings() {
+        getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
+            .edit()
+            .putFloat(KEY_OPACITY, bgOpacity)
+            .putBoolean(KEY_LOCKED, isLocked)
+            .putBoolean(KEY_PASSTHROUGH, isPassthrough)
+            .putInt(KEY_TEXT_COLOR, textColor)
+            .putFloat(KEY_FONT_SIZE, fontSizeSp)
+            .apply()
+    }
+
+    private fun hideOverlay() {
+        if (!isShowing) return
+        try {
+            windowManager?.removeView(overlayView)
+        } catch (_: Exception) {}
+        overlayView = null
+        karaokeView = null
+        tvNextLyric = null
+        btnClose = null
+        btnLock = null
+        layoutParams = null
+        isShowing = false
+    }
+
+    private fun createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                CHANNEL_ID,
+                "桌面歌词",
+                NotificationManager.IMPORTANCE_LOW
+            ).apply {
+                description = "桌面歌词服务通知"
+                setShowBadge(false)
+            }
+            val manager = getSystemService(NotificationManager::class.java)
+            manager.createNotificationChannel(channel)
+        }
+    }
+
+    private fun buildNotification(): Notification {
+        val intent = packageManager.getLaunchIntentForPackage(packageName)
+        val pendingIntent = PendingIntent.getActivity(
+            this, 0, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val builder: Notification.Builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            Notification.Builder(this, CHANNEL_ID)
+        } else {
+            @Suppress("DEPRECATION")
+            Notification.Builder(this)
+        }
+
+        builder.setContentTitle("KA Music 桌面歌词")
+        builder.setContentText("桌面歌词显示中")
+        builder.setSmallIcon(android.R.drawable.ic_dialog_info)
+        builder.setContentIntent(pendingIntent)
+        builder.setOngoing(true)
+        return builder.build()
+    }
+
+    override fun onDestroy() {
+        hideOverlay()
+        super.onDestroy()
+    }
+}
