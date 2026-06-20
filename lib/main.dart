@@ -4,8 +4,11 @@ import 'package:flutter/services.dart';
 
 import 'config/app_config.dart';
 import 'controllers/auth_controller.dart';
+import 'controllers/download_controller.dart';
 import 'controllers/player_controller.dart';
 import 'core/api_client.dart';
+import 'services/cache_service.dart';
+import 'services/download_service.dart';
 import 'services/music_audio_handler.dart';
 import 'services/music_api.dart';
 import 'ui/app_theme.dart';
@@ -52,6 +55,9 @@ class KaMusicApp extends StatefulWidget {
 class _KaMusicAppState extends State<KaMusicApp> with WidgetsBindingObserver {
   late final ApiClient _client;
   late final MusicApi _api;
+  late final CacheService _cacheService;
+  late final DownloadService _downloadService;
+  late final DownloadController _downloads;
   late final AuthController _auth;
   late final PlayerController _player;
 
@@ -61,9 +67,14 @@ class _KaMusicAppState extends State<KaMusicApp> with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     _client = widget.client;
     _api = widget.api;
-    _auth = AuthController(_api);
-    _player = PlayerController(_api, widget.audioHandler);
+    _cacheService = CacheService();
+    _downloadService = DownloadService();
+    _downloads = DownloadController(_downloadService, _api);
+    _auth = AuthController(_api, _cacheService);
+    _player = PlayerController(_api, widget.audioHandler)
+      ..downloadController = _downloads;
     _auth.restore();
+    _downloads.initialize();
   }
 
   @override
@@ -71,6 +82,8 @@ class _KaMusicAppState extends State<KaMusicApp> with WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
     _auth.dispose();
     _player.dispose();
+    _downloads.dispose();
+    _downloadService.dispose();
     _client.close();
     super.dispose();
   }
@@ -108,7 +121,13 @@ class _KaMusicAppState extends State<KaMusicApp> with WidgetsBindingObserver {
             return LoginPage(auth: _auth);
           }
 
-          return AppShell(api: _api, auth: _auth, player: _player);
+          return AppShell(
+            api: _api,
+            auth: _auth,
+            player: _player,
+            cache: _cacheService,
+            downloads: _downloads,
+          );
         },
       ),
     );

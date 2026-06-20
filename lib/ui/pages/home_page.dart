@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 
+import '../../config/app_config.dart';
 import '../../controllers/auth_controller.dart';
 import '../../controllers/player_controller.dart';
 import '../../models/app_version.dart';
 import '../../models/music_models.dart';
 import '../../services/app_update_service.dart';
+import '../../services/cache_service.dart';
 import '../../services/music_api.dart';
 import '../widgets/app_update_widgets.dart';
 import '../widgets/artwork.dart';
@@ -20,11 +22,13 @@ class HomePage extends StatefulWidget {
     required this.api,
     required this.auth,
     required this.player,
+    required this.cache,
   });
 
   final MusicApi api;
   final AuthController auth;
   final PlayerController player;
+  final CacheService cache;
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -49,6 +53,8 @@ class _HomePageState extends State<HomePage> {
       _future = Future.value(cached);
     } else if (!widget.auth.isRestoring) {
       _future = _load();
+    } else {
+      _tryRestoreFromCache();
     }
     widget.auth.addListener(_handleAuthChanged);
     if (AppUpdateService.isSupportedPlatform) {
@@ -84,7 +90,42 @@ class _HomePageState extends State<HomePage> {
       albums: results[2] as List<AlbumShopItem>,
     );
     _cachedData = data;
+    await widget.cache.write('cache_home', {
+      'daily': data.daily.toCache(),
+      'playlists': data.playlists.map((p) => p.toCache()).toList(),
+      'albums': data.albums.map((a) => a.toCache()).toList(),
+    });
     return data;
+  }
+
+  Future<void> _tryRestoreFromCache() async {
+    final cached = await widget.cache.read<Map<String, dynamic>>(
+      'cache_home',
+      decode: (json) => json,
+      ttl: AppConfig.homeCacheTtl,
+    );
+    if (!mounted || _future != null) return;
+    if (cached != null) {
+      final data = _homeDataFromCache(cached.data);
+      _cachedData = data;
+      setState(() {
+        _future = Future.value(data);
+      });
+    }
+  }
+
+  _HomeData _homeDataFromCache(Map<String, dynamic> json) {
+    return _HomeData(
+      daily: DailyRecommend.fromCache(json['daily'] as Map<String, dynamic>),
+      playlists: (json['playlists'] as List? ?? const [])
+          .whereType<Map<String, dynamic>>()
+          .map(PlaylistSummary.fromCache)
+          .toList(),
+      albums: (json['albums'] as List? ?? const [])
+          .whereType<Map<String, dynamic>>()
+          .map(AlbumShopItem.fromCache)
+          .toList(),
+    );
   }
 
   Future<void> _refresh() async {
@@ -928,6 +969,19 @@ class _HomeSongRow extends StatelessWidget {
                             song: song,
                           ),
                         ),
+                        if (player.downloadController != null)
+                          SongSheetAction(
+                            icon: player.downloadController!.isDownloaded(song)
+                                ? Icons.download_done_rounded
+                                : Icons.download_rounded,
+                            title: player.downloadController!.isDownloaded(song)
+                                ? '已下载'
+                                : '下载',
+                            onTap: () => player.downloadController!.download(
+                              song,
+                              player.audioQuality,
+                            ),
+                          ),
                       ],
                     );
                   },

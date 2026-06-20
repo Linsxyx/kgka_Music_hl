@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 
 import '../../controllers/auth_controller.dart';
+import '../../controllers/download_controller.dart';
 import '../../controllers/player_controller.dart';
 import '../../models/music_models.dart';
 import '../../services/music_api.dart';
 import '../widgets/artwork.dart';
+import 'downloaded_songs_page.dart';
 import 'playlist_detail_page.dart';
 import 'settings_page.dart';
 
@@ -14,11 +16,13 @@ class LibraryPage extends StatelessWidget {
     required this.api,
     required this.auth,
     required this.player,
+    required this.downloads,
   });
 
   final MusicApi api;
   final AuthController auth;
   final PlayerController player;
+  final DownloadController downloads;
 
   @override
   Widget build(BuildContext context) {
@@ -82,15 +86,23 @@ class LibraryPage extends StatelessWidget {
                   child: _AccountRow(auth: auth),
                 ),
               ),
-              // Liked songs card
+              // Quick action cards (horizontal scrollable)
               SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(18, 16, 18, 0),
-                  child: _LikedCard(
-                    auth: auth,
-                    onTap: auth.likedPlaylist == null
-                        ? null
-                        : () => openPlaylist(auth.likedPlaylist!),
+                child: _QuickActionRow(
+                  auth: auth,
+                  downloads: downloads,
+                  onOpenLiked: auth.likedPlaylist == null
+                      ? null
+                      : () => openPlaylist(auth.likedPlaylist!),
+                  onOpenDownloads: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => DownloadedSongsPage(
+                        api: api,
+                        auth: auth,
+                        player: player,
+                        downloads: downloads,
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -201,68 +213,120 @@ class _AccountRow extends StatelessWidget {
   }
 }
 
-// --- Liked songs card (standalone) ---
+// --- Quick action row (horizontal scrollable cards) ---
 
-class _LikedCard extends StatelessWidget {
-  const _LikedCard({required this.auth, required this.onTap});
+class _QuickActionRow extends StatelessWidget {
+  const _QuickActionRow({
+    required this.auth,
+    required this.downloads,
+    required this.onOpenLiked,
+    required this.onOpenDownloads,
+  });
 
   final AuthController auth;
+  final DownloadController downloads;
+  final VoidCallback? onOpenLiked;
+  final VoidCallback onOpenDownloads;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(18, 16, 0, 0),
+      child: SizedBox(
+        height: 116,
+        child: ListView(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.only(right: 18),
+          children: [
+            _QuickActionCard(
+              icon: Icons.favorite_rounded,
+              iconColor: const Color.fromARGB(176, 255, 99, 151),
+              subtitle: '${auth.likedCount} 首歌曲',
+              title: '我喜欢',
+              onTap: onOpenLiked,
+            ),
+            const SizedBox(width: 12),
+            AnimatedBuilder(
+              animation: downloads,
+              builder: (context, _) {
+                return _QuickActionCard(
+                  icon: Icons.download_rounded,
+                  iconColor: Theme.of(context).colorScheme.primary,
+                  subtitle: '${downloads.downloadedSongs.length} 首歌曲',
+                  title: '已下载',
+                  onTap: onOpenDownloads,
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _QuickActionCard extends StatelessWidget {
+  const _QuickActionCard({
+    required this.icon,
+    required this.iconColor,
+    required this.subtitle,
+    required this.title,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final Color iconColor;
+  final String subtitle;
+  final String title;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return Material(
-      color: colorScheme.surfaceContainer,
-      borderRadius: BorderRadius.circular(14),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Row(
-            children: [
-              Container(
-                width: 50,
-                height: 50,
-                decoration: BoxDecoration(
-                  color: const Color.fromARGB(176, 255, 99, 151),
-                  borderRadius: BorderRadius.circular(12),
+    return Container(
+      width: 104,
+      margin: const EdgeInsets.only(right: 0),
+      child: Material(
+        color: colorScheme.surfaceContainer,
+        borderRadius: BorderRadius.circular(14),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: iconColor,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(icon, color: Colors.white, size: 22),
                 ),
-                child: const Icon(
-                  Icons.favorite_rounded,
-                  color: Colors.white,
-                  size: 24,
-                ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      '我喜欢',
-                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '${auth.likedCount} 首歌曲',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                const SizedBox(height: 8),
+                Text(
+                  subtitle,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: colorScheme.onSurfaceVariant,
                       ),
-                    ),
-                  ],
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-              Icon(
-                Icons.chevron_right_rounded,
-                size: 20,
-                color: colorScheme.outline,
-              ),
-            ],
+                const SizedBox(height: 2),
+                Text(
+                  title,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
           ),
         ),
       ),

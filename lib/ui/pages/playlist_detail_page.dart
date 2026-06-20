@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../../config/app_config.dart';
 import '../../controllers/auth_controller.dart';
 import '../../controllers/player_controller.dart';
 import '../../models/music_models.dart';
+import '../../services/cache_service.dart';
 import '../../services/music_api.dart';
 import '../widgets/artwork.dart';
 import '../widgets/mini_player.dart';
@@ -36,6 +38,7 @@ class _PlaylistDetailPageState extends State<PlaylistDetailPage> {
   final _scrollController = ScrollController();
   final _searchController = TextEditingController();
   final _songs = <Song>[];
+  final _cache = CacheService();
 
   PlaylistSummary? _info;
   var _nextPage = 1;
@@ -127,6 +130,35 @@ class _PlaylistDetailPageState extends State<PlaylistDetailPage> {
       _songs.clear();
     });
 
+    final cacheKey = _isAlbum
+        ? 'cache_album_${widget.playlist.albumId ?? widget.playlist.id}'
+        : 'cache_playlist_${widget.playlist.id}';
+
+    // 先读缓存，命中则立即显示
+    CacheResult<Map<String, dynamic>>? cached;
+    try {
+      cached = await _cache.read<Map<String, dynamic>>(
+        cacheKey,
+        decode: (json) => json,
+        ttl: AppConfig.playlistDetailTtl,
+      );
+    } catch (_) {}
+    if (cached != null && mounted) {
+      final cacheData = cached.data;
+      final infoJson = cacheData['info'];
+      setState(() {
+        if (infoJson is Map<String, dynamic>) {
+          _info = PlaylistSummary.fromCache(infoJson);
+        }
+        _songs.clear();
+        _songs.addAll((cacheData['songs'] as List? ?? const [])
+            .whereType<Map<String, dynamic>>()
+            .map(Song.fromCache)
+            .toList());
+        _isInitialLoading = false;
+      });
+    }
+
     try {
       if (_isAlbum) {
         final songPage = await widget.api.albumSongPage(
@@ -138,12 +170,16 @@ class _PlaylistDetailPageState extends State<PlaylistDetailPage> {
 
         setState(() {
           final songs = songPage.songs;
+          _songs.clear();
           _songs.addAll(songs);
           _nextPage = 2;
           _hasMore =
               _songs.length < (widget.playlist.songCount ?? 1 << 31) &&
               songPage.rawItemCount == _pageSize;
           _isInitialLoading = false;
+        });
+        await _cache.write(cacheKey, {
+          'songs': songPage.songs.map((s) => s.toCache()).toList(),
         });
       } else {
         final results = await Future.wait([
@@ -161,6 +197,7 @@ class _PlaylistDetailPageState extends State<PlaylistDetailPage> {
         final songs = songPage.songs;
         setState(() {
           _info = info;
+          _songs.clear();
           _songs.addAll(songs);
           _nextPage = 2;
           _hasMore =
@@ -168,9 +205,17 @@ class _PlaylistDetailPageState extends State<PlaylistDetailPage> {
               songPage.rawItemCount == _pageSize;
           _isInitialLoading = false;
         });
+        await _cache.write(cacheKey, {
+          'info': info.toCache(),
+          'songs': songs.map((s) => s.toCache()).toList(),
+        });
       }
     } catch (error) {
       if (!mounted) return;
+      if (cached != null) {
+        // 有缓存数据，保持不报错（降级）
+        return;
+      }
       setState(() {
         _errorMessage = error.toString();
         _isInitialLoading = false;
@@ -1037,6 +1082,19 @@ class _SongRow extends StatelessWidget {
                             title: '从歌单删除',
                             danger: true,
                             onTap: onDelete,
+                          ),
+                        if (player.downloadController != null)
+                          SongSheetAction(
+                            icon: player.downloadController!.isDownloaded(song)
+                                ? Icons.download_done_rounded
+                                : Icons.download_rounded,
+                            title: player.downloadController!.isDownloaded(song)
+                                ? '已下载'
+                                : '下载',
+                            onTap: () => player.downloadController!.download(
+                              song,
+                              player.audioQuality,
+                            ),
                           ),
                       ],
                     );

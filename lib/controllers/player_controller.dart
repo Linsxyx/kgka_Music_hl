@@ -13,6 +13,7 @@ import '../services/audio_effects_service.dart';
 import '../services/desktop_lyrics_service.dart';
 import '../services/music_api.dart';
 import '../services/music_audio_handler.dart';
+import 'download_controller.dart';
 
 enum PlaybackMode { playlistLoop, shuffle, singleLoop }
 
@@ -68,6 +69,9 @@ class PlayerController extends ChangeNotifier {
       levels: [650, 450, 120, -120, -180, 100, 350, 550, 650, 700],
     ),
   ];
+
+  /// 下载控制器（由 main.dart 在创建后注入，供 UI 访问下载功能）。
+  DownloadController? downloadController;
 
   PlayerController(this._api, this._audioHandler) {
     unawaited(_restoreSettings());
@@ -297,13 +301,22 @@ class PlayerController extends ChangeNotifier {
     unawaited(_syncDesktopLyricsVisibility());
 
     try {
-      final playUrl = await _api.songUrl(song, quality: audioQuality);
-      if (playUrl.url.isEmpty) {
-        throw Exception('这首歌暂时没有可播放地址');
+      String url;
+      String? networkUrl;
+      final local = downloadController?.localPathFor(song, audioQuality);
+      if (local != null) {
+        url = local;
+      } else {
+        final playUrl = await _api.songUrl(song, quality: audioQuality);
+        if (playUrl.url.isEmpty) {
+          throw Exception('这首歌暂时没有可播放地址');
+        }
+        url = playUrl.url;
+        networkUrl = playUrl.url;
       }
       await _audioHandler.loadSong(
         song: song,
-        url: playUrl.url,
+        url: url,
         queueSongs: this.queue,
         queueIndex: currentIndex,
       );
@@ -311,6 +324,12 @@ class PlayerController extends ChangeNotifier {
       notifyListeners();
       unawaited(loadLyrics(song));
       unawaited(_audioHandler.play());
+      // 首播后后台缓存（仅当本次用的是网络 URL）
+      if (networkUrl != null) {
+        unawaited(
+          downloadController?.cacheForPlayback(song, audioQuality, networkUrl),
+        );
+      }
     } catch (error) {
       errorMessage = error.toString();
       isPreparing = false;
@@ -618,13 +637,22 @@ class PlayerController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final playUrl = await _api.songUrl(song, quality: audioQuality);
-      if (playUrl.url.isEmpty) {
-        throw Exception('当前音质暂时没有可播放地址');
+      String url;
+      String? networkUrl;
+      final local = downloadController?.localPathFor(song, audioQuality);
+      if (local != null) {
+        url = local;
+      } else {
+        final playUrl = await _api.songUrl(song, quality: audioQuality);
+        if (playUrl.url.isEmpty) {
+          throw Exception('当前音质暂时没有可播放地址');
+        }
+        url = playUrl.url;
+        networkUrl = playUrl.url;
       }
       await _audioHandler.loadSong(
         song: song,
-        url: playUrl.url,
+        url: url,
         queueSongs: queue,
         queueIndex: currentIndex,
       );
@@ -633,6 +661,12 @@ class PlayerController extends ChangeNotifier {
       }
       if (resumePlayback) {
         await _audioHandler.play();
+      }
+      // 切音质后后台缓存
+      if (networkUrl != null) {
+        unawaited(
+          downloadController?.cacheForPlayback(song, audioQuality, networkUrl),
+        );
       }
     } catch (error) {
       errorMessage = error.toString();

@@ -120,6 +120,16 @@ class UserProfile {
       avatarUrl: normalizeImageUrl(asString(json['pic'])),
     );
   }
+
+  Map<String, dynamic> toCache() =>
+      {'nickname': nickname, 'avatarUrl': avatarUrl};
+
+  factory UserProfile.fromCache(Map<String, dynamic> json) {
+    return UserProfile(
+      nickname: asString(json['nickname']) ?? 'KA Music 用户',
+      avatarUrl: asString(json['avatarUrl']),
+    );
+  }
 }
 
 class VipReceiveItem {
@@ -653,6 +663,48 @@ class Song {
       duration: durationFromMilliseconds(audioInfo['duration']),
     );
   }
+
+  Map<String, dynamic> toCache() => {
+        'id': id,
+        'title': title,
+        'artist': artist,
+        'hash': hash,
+        'albumId': albumId,
+        'albumAudioId': albumAudioId,
+        'albumName': albumName,
+        'coverUrl': coverUrl,
+        'durationMs': duration?.inMilliseconds,
+        'artists': artists
+            .map((a) => {
+                  'id': a.id,
+                  'name': a.name,
+                  'avatarUrl': a.avatarUrl,
+                })
+            .toList(),
+      };
+
+  factory Song.fromCache(Map<String, dynamic> json) {
+    return Song(
+      id: asString(json['id']) ?? '',
+      title: asString(json['title']) ?? '未知歌曲',
+      artist: asString(json['artist']) ?? '未知艺人',
+      hash: asString(json['hash']) ?? '',
+      albumId: asString(json['albumId']),
+      albumAudioId: asString(json['albumAudioId']),
+      albumName: asString(json['albumName']),
+      coverUrl: asString(json['coverUrl']),
+      duration: durationFromMilliseconds(json['durationMs']),
+      artists: asList(json['artists'])
+          .whereType<Map<String, dynamic>>()
+          .map((a) => ArtistRef(
+                id: asString(a['id']) ?? '',
+                name: asString(a['name']) ?? '',
+                avatarUrl: asString(a['avatarUrl']),
+              ))
+          .where((artist) => artist.name.isNotEmpty)
+          .toList(),
+    );
+  }
 }
 
 class FmStation {
@@ -983,6 +1035,26 @@ class DailyRecommend {
           .toList(),
     );
   }
+
+  Map<String, dynamic> toCache() => {
+        'title': title,
+        'subtitle': subtitle,
+        'coverUrl': coverUrl,
+        'songs': songs.map((s) => s.toCache()).toList(),
+      };
+
+  factory DailyRecommend.fromCache(Map<String, dynamic> json) {
+    return DailyRecommend(
+      title: asString(json['title']) ?? '每日推荐',
+      subtitle: asString(json['subtitle']),
+      coverUrl: asString(json['coverUrl']),
+      songs: asList(json['songs'])
+          .whereType<Map<String, dynamic>>()
+          .map(Song.fromCache)
+          .where((song) => song.hash.isNotEmpty)
+          .toList(),
+    );
+  }
 }
 
 class AlbumShopItem {
@@ -1023,6 +1095,28 @@ class AlbumShopItem {
       pic: asString(json['pic']),
       price: asInt(json['price']),
       buyNum: asInt(json['buy_num']),
+    );
+  }
+
+  Map<String, dynamic> toCache() => {
+        'albumName': albumName,
+        'singerName': singerName,
+        'mediaId': mediaId,
+        'topicId': topicId,
+        'pic': pic,
+        'price': price,
+        'buyNum': buyNum,
+      };
+
+  factory AlbumShopItem.fromCache(Map<String, dynamic> json) {
+    return AlbumShopItem(
+      albumName: asString(json['albumName']) ?? '未知专辑',
+      singerName: asString(json['singerName']) ?? '未知歌手',
+      mediaId: asInt(json['mediaId']) ?? 0,
+      topicId: asInt(json['topicId']) ?? 0,
+      pic: asString(json['pic']),
+      price: asInt(json['price']),
+      buyNum: asInt(json['buyNum']),
     );
   }
 }

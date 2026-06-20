@@ -3,13 +3,15 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../config/app_config.dart';
 import '../core/api_client.dart';
 import '../models/music_models.dart';
+import '../services/cache_service.dart';
 import '../services/music_api.dart';
 import '../services/vip_background_task.dart';
 
 class AuthController extends ChangeNotifier {
-  AuthController(this._api);
+  AuthController(this._api, this._cacheService);
 
   static const _tokenKey = 'ka_music_token';
   static const _t1Key = 'ka_music_t1';
@@ -19,6 +21,7 @@ class AuthController extends ChangeNotifier {
   static const _playlistEmptyCountPrefix = 'ka_music_playlist_empty_count';
   static const _likedHashesKey = 'ka_music_liked_hashes';
   final MusicApi _api;
+  final CacheService _cacheService;
   late final VipBackgroundTask _vipBackgroundTask = VipBackgroundTask(_api);
 
   bool isRestoring = true;
@@ -223,6 +226,15 @@ class AuthController extends ChangeNotifier {
 
       playlists = await _loadCachedPlaylists();
       await _loadLikedHashes();
+      // 先读缓存的用户信息，静默刷新由 refreshProfile 完成
+      final cachedProfile = await _cacheService.read<UserProfile>(
+        _userCacheKey,
+        decode: UserProfile.fromCache,
+        ttl: AppConfig.userProfileTtl,
+      );
+      if (cachedProfile != null) {
+        profile = cachedProfile.data;
+      }
       await refreshProfile(silent: true);
       _vipBackgroundTask.schedule(session);
     } catch (error) {
@@ -304,6 +316,9 @@ class AuthController extends ChangeNotifier {
   Future<void> refreshProfile({bool silent = false}) async {
     await _run(() async {
       profile = await _api.userDetail();
+      if (profile != null) {
+        await _cacheService.write(_userCacheKey, profile!.toCache());
+      }
       playlists = await _loadUserPlaylistsWithCache();
       await _syncLikedSongs();
     }, silent: silent);
@@ -426,6 +441,8 @@ class AuthController extends ChangeNotifier {
     return '${_playlistEmptyCountPrefix}_${session?.userId ?? 'default'}';
   }
 
+  String get _userCacheKey => 'cache_user_${session?.userId ?? 'default'}';
+
   Future<void> _clearSession() async {
     final prefs = await SharedPreferences.getInstance();
     session = null;
@@ -439,6 +456,7 @@ class AuthController extends ChangeNotifier {
     await prefs.remove(_playlistCacheKey);
     await prefs.remove(_playlistEmptyCountKey);
     await prefs.remove(_likedHashesKey);
+    await _cacheService.clearUserCache(null);
     notifyListeners();
   }
 

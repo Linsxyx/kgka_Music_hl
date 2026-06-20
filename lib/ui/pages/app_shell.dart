@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../../controllers/auth_controller.dart';
+import '../../controllers/download_controller.dart';
 import '../../controllers/player_controller.dart';
+import '../../services/cache_service.dart';
 import '../../services/music_api.dart';
 import '../widgets/mini_player.dart';
 import 'home_page.dart';
@@ -13,11 +15,15 @@ class AppShell extends StatefulWidget {
     required this.api,
     required this.auth,
     required this.player,
+    required this.cache,
+    required this.downloads,
   });
 
   final MusicApi api;
   final AuthController auth;
   final PlayerController player;
+  final CacheService cache;
+  final DownloadController downloads;
 
   @override
   State<AppShell> createState() => _AppShellState();
@@ -31,8 +37,8 @@ class _AppShellState extends State<AppShell> {
   void initState() {
     super.initState();
     _pages = [
-      HomePage(api: widget.api, auth: widget.auth, player: widget.player),
-      LibraryPage(api: widget.api, auth: widget.auth, player: widget.player),
+      HomePage(api: widget.api, auth: widget.auth, player: widget.player, cache: widget.cache),
+      LibraryPage(api: widget.api, auth: widget.auth, player: widget.player, downloads: widget.downloads),
     ];
   }
 

@@ -746,6 +746,19 @@ class _SearchResults extends StatelessWidget {
                                     song: song,
                                   ),
                                 ),
+                                if (player.downloadController != null)
+                                  SongSheetAction(
+                                    icon: player.downloadController!.isDownloaded(song)
+                                        ? Icons.download_done_rounded
+                                        : Icons.download_rounded,
+                                    title: player.downloadController!.isDownloaded(song)
+                                        ? '已下载'
+                                        : '下载',
+                                    onTap: () => player.downloadController!.download(
+                                      song,
+                                      player.audioQuality,
+                                    ),
+                                  ),
                               ],
                             );
                           },
