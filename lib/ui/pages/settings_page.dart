@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../../config/app_config.dart';
 import '../../controllers/auth_controller.dart';
 import '../../controllers/player_controller.dart';
+import '../../controllers/theme_controller.dart';
 import '../../services/app_update_service.dart';
 import '../../services/music_api.dart';
 import '../widgets/audio_effects_sheet.dart';
@@ -12,6 +13,7 @@ import '../widgets/toast.dart';
 import 'about_page.dart';
 import 'audio_interruption_settings_page.dart';
 import 'desktop_lyrics_settings_page.dart';
+import 'personalization_settings_page.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({
@@ -19,11 +21,13 @@ class SettingsPage extends StatelessWidget {
     required this.api,
     required this.auth,
     required this.player,
+    required this.theme,
   });
 
   final MusicApi api;
   final AuthController auth;
   final PlayerController player;
+  final ThemeController theme;
 
   @override
   Widget build(BuildContext context) {
@@ -165,6 +169,27 @@ class SettingsPage extends StatelessWidget {
                           ? AppConfig.customBaseUrl
                           : '默认：${AppConfig.defaultApiBaseUrl}',
                       onTap: () => _editApiBaseUrl(context),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                // Personalization section
+                _SectionHeader(title: '个性化'),
+                const SizedBox(height: 8),
+                _SettingsCard(
+                  children: [
+                    _SettingsTile(
+                      icon: Icons.palette_rounded,
+                      iconColor: colorScheme.primary,
+                      title: '皮肤与背景',
+                      subtitle: '配色方案与自定义全局背景图',
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => PersonalizationSettingsPage(
+                            themeController: theme,
+                          ),
+                        ),
+                      ),
                     ),
                   ],
                 ),

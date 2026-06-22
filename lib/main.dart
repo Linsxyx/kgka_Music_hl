@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/services.dart';
@@ -6,6 +8,7 @@ import 'config/app_config.dart';
 import 'controllers/auth_controller.dart';
 import 'controllers/download_controller.dart';
 import 'controllers/player_controller.dart';
+import 'controllers/theme_controller.dart';
 import 'core/api_client.dart';
 import 'services/cache_service.dart';
 import 'services/download_service.dart';
@@ -34,7 +37,15 @@ Future<void> main() async {
     ),
   );
 
-  runApp(KaMusicApp(client: client, api: api, audioHandler: audioHandler));
+  final themeController = ThemeController();
+  await themeController.load();
+
+  runApp(KaMusicApp(
+    client: client,
+    api: api,
+    audioHandler: audioHandler,
+    themeController: themeController,
+  ));
 }
 
 class KaMusicApp extends StatefulWidget {
@@ -43,11 +54,13 @@ class KaMusicApp extends StatefulWidget {
     required this.client,
     required this.api,
     required this.audioHandler,
+    required this.themeController,
   });
 
   final ApiClient client;
   final MusicApi api;
   final MusicAudioHandler audioHandler;
+  final ThemeController themeController;
 
   @override
   State<KaMusicApp> createState() => _KaMusicAppState();
@@ -61,6 +74,7 @@ class _KaMusicAppState extends State<KaMusicApp> with WidgetsBindingObserver {
   late final DownloadController _downloads;
   late final AuthController _auth;
   late final PlayerController _player;
+  late final ThemeController _theme;
 
   @override
   void initState() {
@@ -75,6 +89,7 @@ class _KaMusicAppState extends State<KaMusicApp> with WidgetsBindingObserver {
     _player = PlayerController(_api, widget.audioHandler)
       ..downloadController = _downloads
       ..cacheService = _cacheService;
+    _theme = widget.themeController;
     _auth.restore();
     _downloads.initialize();
   }
@@ -107,32 +122,101 @@ class _KaMusicAppState extends State<KaMusicApp> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: AppConfig.appName,
-      debugShowCheckedModeBanner: false,
-      navigatorKey: Toast.navigatorKey,
-      themeMode: ThemeMode.system,
-      theme: AppTheme.light(),
-      darkTheme: AppTheme.dark(),
-      builder: (context, child) {
-        return _SystemUiOverlay(child: child ?? const SizedBox.shrink());
-      },
-      home: AnimatedBuilder(
-        animation: _auth,
-        builder: (context, _) {
-          if (!_auth.isRestoring && !_auth.isLoggedIn) {
-            return LoginPage(auth: _auth);
-          }
+    return AnimatedBuilder(
+      animation: _theme,
+      builder: (context, _) {
+        return MaterialApp(
+          title: AppConfig.appName,
+          debugShowCheckedModeBanner: false,
+          navigatorKey: Toast.navigatorKey,
+          themeMode: ThemeMode.system,
+          theme: AppTheme.light(
+            seedColor: _theme.seedColor,
+            transparentBackground: _theme.backgroundEnabled,
+          ),
+          darkTheme: AppTheme.dark(
+            seedColor: _theme.seedColor,
+            transparentBackground: _theme.backgroundEnabled,
+          ),
+          builder: (context, child) {
+            return _AppBackground(
+              themeController: _theme,
+              child: _SystemUiOverlay(child: child ?? const SizedBox.shrink()),
+            );
+          },
+          home: AnimatedBuilder(
+            animation: _auth,
+            builder: (context, _) {
+              if (!_auth.isRestoring && !_auth.isLoggedIn) {
+                return LoginPage(auth: _auth);
+              }
 
-          return AppShell(
-            api: _api,
-            auth: _auth,
-            player: _player,
-            cache: _cacheService,
-            downloads: _downloads,
-          );
-        },
-      ),
+              return AppShell(
+                api: _api,
+                auth: _auth,
+                player: _player,
+                cache: _cacheService,
+                downloads: _downloads,
+                theme: _theme,
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// 全局背景图层。
+///
+/// 当用户启用了自定义背景图时，在所有页面内容下方显示背景图，
+/// 并叠加半透明遮罩（由 [ThemeController.backgroundOpacity] 控制）。
+class _AppBackground extends StatelessWidget {
+  const _AppBackground({required this.themeController, required this.child});
+
+  final ThemeController themeController;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: themeController,
+      builder: (context, _) {
+        final path = themeController.backgroundImagePath;
+        final enabled = themeController.backgroundEnabled;
+
+        if (!enabled || path == null) {
+          return child;
+        }
+
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        final overlayColor = isDark
+            ? const Color(0xFF06070A)
+            : Colors.white;
+        final opacity = themeController.backgroundOpacity;
+
+        return Stack(
+          children: [
+            // 背景图层
+            Positioned.fill(
+              child: Image.file(
+                File(path),
+                fit: BoxFit.cover,
+                gaplessPlayback: true,
+                errorBuilder: (_, _, _) => const SizedBox.shrink(),
+              ),
+            ),
+            // 半透明遮罩（opacity 越大遮罩越透明，背景图越明显）
+            Positioned.fill(
+              child: ColoredBox(
+                color: overlayColor.withValues(alpha: 1.0 - opacity),
+              ),
+            ),
+            // 页面内容
+            child,
+          ],
+        );
+      },
     );
   }
 }

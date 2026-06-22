@@ -1,0 +1,155 @@
+import 'dart:io';
+
+import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+/// 全局个性化设置控制器。
+///
+/// 管理：
+/// - 全局种子色（影响配色方案）
+/// - 自定义全局背景图（开关 + 图片路径 + 透明度）
+///
+/// 通过 SharedPreferences 持久化，通过 ChangeNotifier 驱动 UI 重建。
+class ThemeController extends ChangeNotifier {
+  ThemeController();
+
+  // ===== SharedPreferences keys =====
+  static const _seedColorKey = 'theme.seed_color';
+  static const _bgEnabledKey = 'theme.bg_enabled';
+  static const _bgImagePathKey = 'theme.bg_image_path';
+  static const _bgOpacityKey = 'theme.bg_opacity';
+
+  /// 预设种子色列表。
+  static const presetColors = <_PresetColor>[
+    _PresetColor(name: '经典蓝', color: Color(0xFF1478FF)),
+    _PresetColor(name: '酷狗红', color: Color(0xFFFF2D55)),
+    _PresetColor(name: '清新绿', color: Color(0xFF24C768)),
+    _PresetColor(name: '优雅紫', color: Color(0xFF8B5CF6)),
+    _PresetColor(name: '暖阳橙', color: Color(0xFFF59E0B)),
+    _PresetColor(name: '樱花粉', color: Color(0xFFEC4899)),
+    _PresetColor(name: '天际青', color: Color(0xFF06B6D4)),
+    _PresetColor(name: '石墨灰', color: Color(0xFF64748B)),
+  ];
+
+  Color _seedColor = const Color(0xFF1478FF);
+  bool _backgroundEnabled = false;
+  String? _backgroundImagePath;
+  double _backgroundOpacity = 0.15;
+
+  Color get seedColor => _seedColor;
+  bool get backgroundEnabled => _backgroundEnabled;
+  String? get backgroundImagePath => _backgroundImagePath;
+  double get backgroundOpacity => _backgroundOpacity;
+
+  /// 是否使用了非默认种子色。
+  bool get hasCustomSeedColor => _seedColor != const Color(0xFF1478FF);
+
+  /// 加载持久化设置。
+  Future<void> load() async {
+    final prefs = await SharedPreferences.getInstance();
+    final colorValue = prefs.getInt(_seedColorKey);
+    if (colorValue != null) {
+      _seedColor = Color(colorValue);
+    }
+    _backgroundEnabled = prefs.getBool(_bgEnabledKey) ?? false;
+    _backgroundImagePath = prefs.getString(_bgImagePathKey);
+    final opacity = prefs.getDouble(_bgOpacityKey);
+    if (opacity != null) {
+      _backgroundOpacity = opacity.clamp(0.0, 0.8);
+    }
+    notifyListeners();
+  }
+
+  /// 设置全局种子色。
+  Future<void> setSeedColor(Color color) async {
+    if (_seedColor == color) return;
+    _seedColor = color;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_seedColorKey, color.toARGB32());
+    notifyListeners();
+  }
+
+  /// 开启/关闭自定义背景图。
+  Future<void> setBackgroundEnabled(bool enabled) async {
+    if (_backgroundEnabled == enabled) return;
+    _backgroundEnabled = enabled;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_bgEnabledKey, enabled);
+    notifyListeners();
+  }
+
+  /// 设置背景图路径（null 表示清除）。
+  Future<void> setBackgroundImagePath(String? path) async {
+    _backgroundImagePath = path;
+    final prefs = await SharedPreferences.getInstance();
+    if (path != null) {
+      await prefs.setString(_bgImagePathKey, path);
+    } else {
+      await prefs.remove(_bgImagePathKey);
+    }
+    notifyListeners();
+  }
+
+  /// 设置背景透明度（0.0 ~ 0.8，值越大背景越明显）。
+  Future<void> setBackgroundOpacity(double opacity) async {
+    _backgroundOpacity = opacity.clamp(0.0, 0.8);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble(_bgOpacityKey, _backgroundOpacity);
+    notifyListeners();
+  }
+
+  /// 从相册选择图片并复制到应用永久目录。
+  ///
+  /// 返回是否成功设置。
+  Future<bool> pickAndSetBackgroundImage() async {
+    // 延迟导入避免非必要平台初始化
+    final ImagePicker picker = ImagePicker();
+    final xFile = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 90,
+    );
+    if (xFile == null) return false;
+
+    final sourceFile = File(xFile.path);
+    if (!await sourceFile.exists()) return false;
+
+    // 复制到应用文档目录，避免临时文件被系统清理
+    final docsDir = await getApplicationDocumentsDirectory();
+    final ext = xFile.path.contains('.') 
+        ? xFile.path.substring(xFile.path.lastIndexOf('.')) 
+        : '.jpg';
+    final permanentPath = '${docsDir.path}/bg_custom$ext';
+    await sourceFile.copy(permanentPath);
+
+    await setBackgroundImagePath(permanentPath);
+    if (!_backgroundEnabled) {
+      await setBackgroundEnabled(true);
+    }
+    return true;
+  }
+
+  /// 清除自定义背景图。
+  Future<void> clearBackgroundImage() async {
+    final path = _backgroundImagePath;
+    if (path != null) {
+      try {
+        final file = File(path);
+        if (await file.exists()) {
+          await file.delete();
+        }
+      } catch (_) {}
+    }
+    await setBackgroundImagePath(null);
+    await setBackgroundEnabled(false);
+  }
+}
+
+/// 预设颜色项。
+class _PresetColor {
+  const _PresetColor({required this.name, required this.color});
+
+  final String name;
+  final Color color;
+}

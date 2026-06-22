@@ -95,10 +95,10 @@ class MiniPlayer extends StatelessWidget {
                                               overflow: TextOverflow.ellipsis,
                                               style: Theme.of(context)
                                                   .textTheme
-                                                  .titleMedium
+                                                  .titleSmall
                                                   ?.copyWith(
                                                     fontWeight: FontWeight.w900,
-                                                    fontSize: 14,
+                                                    fontSize: 16,
                                                   ),
                                             ),
                                             Text(
@@ -107,11 +107,12 @@ class MiniPlayer extends StatelessWidget {
                                               overflow: TextOverflow.ellipsis,
                                               style: Theme.of(context)
                                                   .textTheme
-                                                  .titleSmall
+                                                  .bodySmall
                                                   ?.copyWith(
                                                     color: colorScheme
                                                         .onSurfaceVariant,
                                                     fontWeight: FontWeight.w600,
+                                                    fontSize: 14,
                                                   ),
                                             ),
                                           ],

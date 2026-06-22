@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../controllers/auth_controller.dart';
 import '../../controllers/download_controller.dart';
 import '../../controllers/player_controller.dart';
+import '../../controllers/theme_controller.dart';
 import '../../models/music_models.dart';
 import '../../services/music_api.dart';
 import '../widgets/artwork.dart';
@@ -18,12 +19,14 @@ class LibraryPage extends StatelessWidget {
     required this.auth,
     required this.player,
     required this.downloads,
+    required this.theme,
   });
 
   final MusicApi api;
   final AuthController auth;
   final PlayerController player;
   final DownloadController downloads;
+  final ThemeController theme;
 
   @override
   Widget build(BuildContext context) {
@@ -43,7 +46,12 @@ class LibraryPage extends StatelessWidget {
     void openSettings() {
       Navigator.of(context).push(
         MaterialPageRoute(
-          builder: (_) => SettingsPage(api: api, auth: auth, player: player),
+          builder: (_) => SettingsPage(
+            api: api,
+            auth: auth,
+            player: player,
+            theme: theme,
+          ),
         ),
       );
     }

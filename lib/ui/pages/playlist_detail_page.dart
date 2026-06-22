@@ -13,6 +13,9 @@ import '../widgets/song_action_sheets.dart';
 import '../widgets/toast.dart';
 import 'artist_detail_page.dart';
 
+/// 缓存中完整歌单歌曲列表的 key 后缀。
+const _fullSongsCacheSuffix = '_full';
+
 enum _PlaylistAction { collect, deleteOrUncollect }
 
 class PlaylistDetailPage extends StatefulWidget {
@@ -102,9 +105,38 @@ class _PlaylistDetailPageState extends State<PlaylistDetailPage> {
       final id = _isAlbum
           ? (widget.playlist.albumId ?? widget.playlist.id)
           : widget.playlist.id;
-      final allSongs = _isAlbum
-          ? await widget.api.albumSongs(id, page: 1, pageSize: 5000)
-          : await widget.api.playlistSongs(id, fetchAll: true);
+
+      // 优先尝试从完整歌单缓存读取（命中则跳过网络请求）
+      final fullCacheKey = _isAlbum
+          ? 'cache_album_${widget.playlist.albumId ?? widget.playlist.id}$_fullSongsCacheSuffix'
+          : 'cache_playlist_${widget.playlist.id}$_fullSongsCacheSuffix';
+
+      CacheResult<Map<String, dynamic>>? fullCached;
+      try {
+        fullCached = await _cache.read<Map<String, dynamic>>(
+          fullCacheKey,
+          decode: (json) => json,
+          ttl: AppConfig.playlistDetailTtl,
+        );
+      } catch (_) {}
+
+      List<Song> allSongs;
+      if (fullCached != null) {
+        allSongs = (fullCached.data['songs'] as List? ?? const [])
+            .whereType<Map<String, dynamic>>()
+            .map(Song.fromCache)
+            .where((song) => song.hash.isNotEmpty)
+            .toList();
+      } else {
+        allSongs = _isAlbum
+            ? await widget.api.albumSongs(id, page: 1, pageSize: 5000)
+            : await widget.api.playlistSongs(id, fetchAll: true);
+        // 写入完整歌单缓存，后续播放可直接复用
+        await _cache.write(fullCacheKey, {
+          'songs': allSongs.map((s) => s.toCache()).toList(),
+        });
+      }
+
       if (!mounted) return;
       setState(() {
         _songs
@@ -117,6 +149,27 @@ class _PlaylistDetailPageState extends State<PlaylistDetailPage> {
     } catch (_) {
       if (mounted) setState(() => _isLoadingAllSongs = false);
     }
+  }
+
+  /// 确保播放队列包含完整歌单内容。
+  ///
+  /// 当歌单因分页仅加载前 N 首时，对比播放队列与歌单总歌曲数量。
+  /// 若不一致则自动获取完整歌单数据（优先读缓存），保障播放队列完整。
+  /// 搜索模式下仅返回过滤后的结果。
+  Future<List<Song>> _ensureFullQueueForPlayback() async {
+    // 搜索模式下仅播放搜索结果
+    if (_searchQuery.isNotEmpty) {
+      return _filteredSongs;
+    }
+    // 已加载全部或总数未知，直接返回当前列表
+    final totalCount = _currentPlaylist.songCount;
+    if (_allSongsLoaded || totalCount == null || _songs.length >= totalCount) {
+      return _filteredSongs;
+    }
+    // 队列数量与歌单总数不一致，需要加载完整歌单
+    Toast.info('正在加载完整歌单…');
+    await _loadAllSongs();
+    return _filteredSongs;
   }
 
   Future<void> _loadInitial() async {
@@ -514,10 +567,14 @@ class _PlaylistDetailPageState extends State<PlaylistDetailPage> {
                     loadedCount: _songs.length,
                     onPlay: _filteredSongs.isEmpty
                         ? null
-                        : () => widget.player.playSong(
-                            _filteredSongs.first,
-                            queue: List<Song>.of(_filteredSongs),
-                          ),
+                        : () async {
+                            final queue = await _ensureFullQueueForPlayback();
+                            if (!mounted || queue.isEmpty) return;
+                            widget.player.playSong(
+                              queue.first,
+                              queue: List<Song>.of(queue),
+                            );
+                          },
                     searchQuery: _searchQuery,
                     searchResultCount: _searchQuery.isNotEmpty
                         ? _filteredSongs.length
@@ -554,10 +611,14 @@ class _PlaylistDetailPageState extends State<PlaylistDetailPage> {
                           index: index + 1,
                           player: widget.player,
                           canDelete: _canEdit,
-                          onTap: () => widget.player.playSong(
-                            song,
-                            queue: List<Song>.of(_filteredSongs),
-                          ),
+                          onTap: () async {
+                            final queue = await _ensureFullQueueForPlayback();
+                            if (!mounted || queue.isEmpty) return;
+                            widget.player.playSong(
+                              song,
+                              queue: List<Song>.of(queue),
+                            );
+                          },
                           onAddToPlaylist: () => _addSongToPlaylist(song),
                           onDelete: () => _removeSong(song),
                           onViewArtist: () => _openArtist(song),

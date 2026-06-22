@@ -4,19 +4,27 @@ class AppTheme {
   static const blue = Color(0xFF1478FF);
   static const musicRed = Color(0xFFFF2D55);
 
-  static ThemeData light() {
-    return _theme(Brightness.light);
+  static ThemeData light({Color? seedColor, bool transparentBackground = false}) {
+    return _theme(Brightness.light,
+        seedColor: seedColor ?? blue,
+        transparentBackground: transparentBackground);
   }
 
-  static ThemeData dark() {
-    return _theme(Brightness.dark);
+  static ThemeData dark({Color? seedColor, bool transparentBackground = false}) {
+    return _theme(Brightness.dark,
+        seedColor: seedColor ?? blue,
+        transparentBackground: transparentBackground);
   }
 
-  static ThemeData _theme(Brightness brightness) {
+  static ThemeData _theme(
+    Brightness brightness, {
+    Color seedColor = blue,
+    bool transparentBackground = false,
+  }) {
     final isDark = brightness == Brightness.dark;
-    final scheme = ColorScheme.fromSeed(seedColor: blue, brightness: brightness)
+    final scheme = ColorScheme.fromSeed(seedColor: seedColor, brightness: brightness)
         .copyWith(
-          primary: isDark ? const Color(0xFF68AEFF) : blue,
+          primary: isDark ? _lighten(seedColor, 0.18) : seedColor,
           secondary: musicRed,
           tertiary: const Color(0xFF24C768),
           surface: isDark ? const Color(0xFF0B0C10) : Colors.white,
@@ -42,7 +50,9 @@ class AppTheme {
     return ThemeData(
       useMaterial3: true,
       colorScheme: scheme,
-      scaffoldBackgroundColor: isDark ? const Color(0xFF06070A) : Colors.white,
+      scaffoldBackgroundColor: transparentBackground
+          ? Colors.transparent
+          : (isDark ? const Color(0xFF06070A) : Colors.white),
       textTheme: const TextTheme(
         labelSmall: TextStyle(fontSize: 10, height: 1.2),
         bodySmall: TextStyle(fontSize: 12, height: 1.3),
@@ -66,7 +76,9 @@ class AppTheme {
       appBarTheme: AppBarTheme(
         centerTitle: false,
         elevation: 0,
-        backgroundColor: Colors.transparent,
+        backgroundColor: transparentBackground
+            ? Colors.transparent
+            : Colors.transparent,
         surfaceTintColor: Colors.transparent,
         foregroundColor: scheme.onSurface,
       ),
@@ -108,5 +120,10 @@ class AppTheme {
         ),
       ),
     );
+  }
+
+  /// 将颜色向白色方向提亮。
+  static Color _lighten(Color color, [double amount = 0.2]) {
+    return Color.lerp(color, Colors.white, amount) ?? color;
   }
 }
