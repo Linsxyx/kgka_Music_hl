@@ -8,7 +8,6 @@ import '../../services/app_update_service.dart';
 import '../../services/music_api.dart';
 import '../widgets/audio_effects_sheet.dart';
 import '../widgets/audio_quality_sheet.dart';
-import '../widgets/app_update_widgets.dart';
 import 'about_page.dart';
 import 'audio_interruption_settings_page.dart';
 import 'desktop_lyrics_settings_page.dart';
@@ -176,22 +175,13 @@ class SettingsPage extends StatelessWidget {
                 const SizedBox(height: 8),
                 _SettingsCard(
                   children: [
-                    if (AppUpdateService.isSupportedPlatform) ...[
-                      _SettingsTile(
-                        icon: Icons.system_update_alt_rounded,
-                        iconColor: colorScheme.primary,
-                        title: '检查更新',
-                        onTap: () => checkAppUpdateManually(
-                          context: context,
-                          api: api,
-                        ),
-                      ),
-                      _SettingsDivider(),
-                    ],
                     _SettingsTile(
                       icon: Icons.info_outline_rounded,
                       iconColor: colorScheme.primary,
                       title: '关于',
+                      subtitle: AppUpdateService.isSupportedPlatform
+                          ? '版本、更新日志与检查更新'
+                          : '版本与更新日志',
                       onTap: () => Navigator.of(context).push(
                         MaterialPageRoute(
                           builder: (_) => AboutPage(api: api),

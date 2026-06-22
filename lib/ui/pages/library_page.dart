@@ -6,6 +6,7 @@ import '../../controllers/player_controller.dart';
 import '../../models/music_models.dart';
 import '../../services/music_api.dart';
 import '../widgets/artwork.dart';
+import 'cloud_drive_page.dart';
 import 'downloaded_songs_page.dart';
 import 'playlist_detail_page.dart';
 import 'settings_page.dart';
@@ -122,6 +123,8 @@ class LibraryPage extends StatelessWidget {
                 child: _QuickActionRow(
                   auth: auth,
                   downloads: downloads,
+                  player: player,
+                  api: api,
                   onOpenLiked: auth.likedPlaylist == null
                       ? null
                       : () => openPlaylist(auth.likedPlaylist!),
@@ -132,6 +135,15 @@ class LibraryPage extends StatelessWidget {
                         auth: auth,
                         player: player,
                         downloads: downloads,
+                      ),
+                    ),
+                  ),
+                  onOpenCloudDrive: () => Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => CloudDrivePage(
+                        api: api,
+                        auth: auth,
+                        player: player,
                       ),
                     ),
                   ),
@@ -252,14 +264,20 @@ class _QuickActionRow extends StatelessWidget {
   const _QuickActionRow({
     required this.auth,
     required this.downloads,
+    required this.player,
+    required this.api,
     required this.onOpenLiked,
     required this.onOpenDownloads,
+    required this.onOpenCloudDrive,
   });
 
   final AuthController auth;
   final DownloadController downloads;
+  final PlayerController player;
+  final MusicApi api;
   final VoidCallback? onOpenLiked;
   final VoidCallback onOpenDownloads;
+  final VoidCallback onOpenCloudDrive;
 
   @override
   Widget build(BuildContext context) {
@@ -277,6 +295,14 @@ class _QuickActionRow extends StatelessWidget {
               subtitle: '${auth.likedCount} 首歌曲',
               title: '我喜欢',
               onTap: onOpenLiked,
+            ),
+            const SizedBox(width: 12),
+            _QuickActionCard(
+              icon: Icons.cloud_rounded,
+              iconColor: const Color.fromARGB(200, 88, 156, 245),
+              subtitle: '云盘音乐',
+              title: '云盘',
+              onTap: onOpenCloudDrive,
             ),
             const SizedBox(width: 12),
             AnimatedBuilder(

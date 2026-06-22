@@ -461,6 +461,39 @@ class MusicApi {
     return PlayUrl.fromJson(json);
   }
 
+  /// 获取云盘歌曲列表（分页）。
+  Future<CloudDriveResult> cloudDrive({
+    int page = 1,
+    int pageSize = 30,
+  }) async {
+    final json = asMap(
+      await _client.get('/user/cloud', {'page': page, 'pagesize': pageSize}),
+    );
+    final info = CloudDriveInfo.fromJson(json);
+    final songs = asList(json['list'])
+        .whereType<Map<String, dynamic>>()
+        .map(CloudDriveSongMeta.fromJson)
+        .where((item) => item.song.hash.isNotEmpty)
+        .map((item) => item.song)
+        .toList();
+    return CloudDriveResult(info: info, songs: songs);
+  }
+
+  /// 获取云盘歌曲的播放地址。
+  Future<PlayUrl> cloudSongUrl(Song song) async {
+    final json = asMap(
+      await _client.get('/user/cloud/url', {
+        'hash': song.hash,
+        'album_audio_id': song.albumAudioId,
+        'audio_id': song.albumAudioId,
+        'name': song.title,
+      }),
+    );
+    final url = asString(json['url']) ?? '';
+    final hash = asString(json['hash']) ?? song.hash;
+    return PlayUrl(url: url, hash: hash);
+  }
+
   Future<void> createPlaylist(String name, {bool private = false}) async {
     await _client.post(
       '/playlist/create',

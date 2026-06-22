@@ -408,6 +408,7 @@ class Song {
     this.coverUrl,
     this.duration,
     this.artists = const [],
+    this.isCloudDrive = false,
   });
 
   final String id;
@@ -420,6 +421,9 @@ class Song {
   final String? coverUrl;
   final Duration? duration;
   final List<ArtistRef> artists;
+
+  /// 标记是否为云盘歌曲。云盘歌曲的播放地址需通过 `/user/cloud/url` 获取。
+  final bool isCloudDrive;
 
   factory Song.fromSearch(Map<String, dynamic> json) {
     final songId =
@@ -681,6 +685,7 @@ class Song {
                   'avatarUrl': a.avatarUrl,
                 })
             .toList(),
+        if (isCloudDrive) 'isCloudDrive': true,
       };
 
   factory Song.fromCache(Map<String, dynamic> json) {
@@ -703,6 +708,7 @@ class Song {
               ))
           .where((artist) => artist.name.isNotEmpty)
           .toList(),
+      isCloudDrive: json['isCloudDrive'] == true,
     );
   }
 }
@@ -1645,4 +1651,114 @@ String formatDuration(Duration? duration) {
   final minutes = duration.inMinutes.remainder(60).toString().padLeft(2, '0');
   final seconds = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
   return '$minutes:$seconds';
+}
+
+/// 云盘容量信息。
+class CloudDriveInfo {
+  const CloudDriveInfo({
+    this.totalCount,
+    this.usedBytes,
+    this.availableBytes,
+    this.maxBytes,
+  });
+
+  final int? totalCount;
+  final int? usedBytes;
+  final int? availableBytes;
+  final int? maxBytes;
+
+  double get usageRatio {
+    final used = usedBytes ?? 0;
+    final max = maxBytes ?? 0;
+    if (max <= 0) return 0;
+    return (used / max).clamp(0.0, 1.0);
+  }
+
+  factory CloudDriveInfo.fromJson(Map<String, dynamic> json) {
+    return CloudDriveInfo(
+      totalCount: asInt(json['list_count']),
+      usedBytes: asInt(json['used_size']),
+      availableBytes: asInt(json['availble_size'] ?? json['available_size']),
+      maxBytes: asInt(json['max_size']),
+    );
+  }
+}
+
+/// 云盘歌曲分页结果。
+class CloudDriveResult {
+  const CloudDriveResult({required this.info, required this.songs});
+
+  final CloudDriveInfo info;
+  final List<Song> songs;
+}
+
+/// 云盘歌曲的额外元数据（文件大小、比特率、扩展名等）。
+class CloudDriveSongMeta {
+  const CloudDriveSongMeta({
+    required this.song,
+    this.fileSize,
+    this.bitrate,
+    this.fileExt,
+    this.addedAt,
+  });
+
+  final Song song;
+  final int? fileSize;
+  final int? bitrate;
+  final String? fileExt;
+  final DateTime? addedAt;
+
+  factory CloudDriveSongMeta.fromJson(Map<String, dynamic> json) {
+    final albumInfo = asMap(json['album_info']);
+    final authorsRaw = asList(json['authors']).whereType<Map<String, dynamic>>();
+    final artists = authorsRaw
+        .map(
+          (item) => ArtistRef(
+            id: asString(item['author_id']) ?? '',
+            name: asString(item['author_name']) ?? '',
+            avatarUrl: normalizeImageUrl(asString(item['sizable_avatar'])),
+          ),
+        )
+        .where((artist) => artist.name.isNotEmpty)
+        .toList();
+    final authorName = asString(json['author_name']);
+    if (artists.isEmpty && authorName != null && authorName.isNotEmpty) {
+      final names = authorName
+          .split(RegExp(r'\s*[/、,，&]\s*'))
+          .where((name) => name.trim().isNotEmpty);
+      for (final name in names) {
+        artists.add(ArtistRef(id: '', name: name.trim()));
+      }
+    }
+    final artistName = artists.map((artist) => artist.name).join(' / ');
+
+    final song = Song(
+      id: asString(json['audio_id']) ??
+          asString(json['album_audio_id']) ??
+          asString(json['hash']) ??
+          '',
+      title: asString(json['name']) ?? asString(json['audio_name']) ?? '未知歌曲',
+      artist: artistName.isNotEmpty ? artistName : authorName ?? '未知艺人',
+      hash: asString(json['hash']) ?? asString(json['hash_std']) ?? '',
+      albumId: asString(albumInfo['album_id']),
+      albumAudioId:
+          asString(json['album_audio_id']) ?? asString(json['audio_id']),
+      albumName: asString(albumInfo['album_name']),
+      coverUrl: normalizeImageUrl(asString(albumInfo['sizable_cover'])),
+      artists: artists,
+      duration: durationFromMilliseconds(json['timelen']),
+      isCloudDrive: true,
+    );
+
+    final addTime = asInt(json['add_time']);
+    return CloudDriveSongMeta(
+      song: song,
+      fileSize: asInt(json['size']),
+      bitrate: asInt(json['bitrate']),
+      fileExt: asString(json['ext']),
+      addedAt: addTime == null
+          ? null
+          : DateTime.fromMillisecondsSinceEpoch(addTime * 1000),
+    );
+  }
 }
