@@ -4625,6 +4625,52 @@
         }
       }
     },
+    "/audio/match": {
+      "post": {
+        "tags": [
+          "Song"
+        ],
+        "summary": "听歌识曲。使用 multipart/form-data 上传原始 PCM 音频文件。",
+        "requestBody": {
+          "description": "表单上传请求，字段名为 file。",
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "$ref": "#/components/schemas/IFormFile"
+                  }
+                }
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "识曲结果。",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/AudioMatchResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AudioMatchResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AudioMatchResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/audio/ktv/total": {
       "get": {
         "tags": [
@@ -4876,7 +4922,33 @@
         ],
         "responses": {
           "200": {
-            "description": "音乐详情。"
+            "description": "音乐详情。",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PrivilegeLiteData"
+                  }
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PrivilegeLiteData"
+                  }
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PrivilegeLiteData"
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -5278,7 +5350,24 @@
         ],
         "responses": {
           "200": {
-            "description": "用户云盘音乐列表。"
+            "description": "用户云盘音乐列表。",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserCloudResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserCloudResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserCloudResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -5324,7 +5413,24 @@
         ],
         "responses": {
           "200": {
-            "description": "用户云盘音乐 URL。"
+            "description": "用户云盘音乐 URL。",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserCloudUrlResponse"
+                }
+              },
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserCloudUrlResponse"
+                }
+              },
+              "text/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserCloudUrlResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -6764,6 +6870,265 @@
         },
         "description": "歌曲作者写真，对应 /images/audio。"
       },
+      "AudioMatchAlbum": {
+        "type": "object",
+        "properties": {
+          "albumid": {
+            "type": "string"
+          },
+          "albumname": {
+            "type": "string"
+          },
+          "publish_date": {
+            "type": "string"
+          },
+          "img": {
+            "type": "string"
+          },
+          "scid": {
+            "type": "string"
+          }
+        }
+      },
+      "AudioMatchAuthor": {
+        "type": "object",
+        "properties": {
+          "author_id": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "author_name": {
+            "type": "string"
+          }
+        }
+      },
+      "AudioMatchItem": {
+        "type": "object",
+        "properties": {
+          "songid": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "mixsongid": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "audio_id": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "album_id": {
+            "type": "string"
+          },
+          "scid": {
+            "type": "string"
+          },
+          "similar_scid": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "songname": {
+            "type": "string"
+          },
+          "songNameSuffix": {
+            "type": "string"
+          },
+          "singername": {
+            "type": "string"
+          },
+          "remark": {
+            "type": "string"
+          },
+          "str_song_type": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "union_cover": {
+            "type": "string"
+          },
+          "hash_128": {
+            "type": "string"
+          },
+          "hash_320": {
+            "type": "string"
+          },
+          "hash_flac": {
+            "type": "string"
+          },
+          "dist": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "dist_nomelody": {
+            "pattern": "^-?(?:0|[1-9]\\d*)(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$",
+            "type": [
+              "null",
+              "number",
+              "string"
+            ],
+            "format": "double"
+          },
+          "timeoffset": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "timelength_128": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "timelength_320": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "timelength_flac": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "privilege": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "is_play_free": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "is_original": {
+            "type": "string"
+          },
+          "lyric_id": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "authors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AudioMatchAuthor"
+            }
+          },
+          "album": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AudioMatchAlbum"
+            }
+          }
+        },
+        "description": "单条识曲结果。"
+      },
+      "AudioMatchResponse": {
+        "type": "object",
+        "properties": {
+          "server_time": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "pcm_second": {
+            "type": "string"
+          },
+          "process": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/JsonElement"
+              }
+            ]
+          },
+          "data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AudioMatchItem"
+            }
+          },
+          "status": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "error_code": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        },
+        "description": "听歌识曲响应。"
+      },
       "AudioMvItem": {
         "type": "object",
         "properties": {
@@ -7942,6 +8307,10 @@
           }
         }
       },
+      "IFormFile": {
+        "type": "string",
+        "format": "binary"
+      },
       "JsonElement": {},
       "LyricResult": {
         "required": [
@@ -8883,6 +9252,302 @@
           }
         },
         "description": "歌曲播放地址结果。"
+      },
+      "PrivilegeAudioInfo": {
+        "type": "object",
+        "properties": {
+          "duration": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "filesize": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "bitrate": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "extname": {
+            "type": "string"
+          },
+          "image": {
+            "type": "string"
+          },
+          "imgsize": {
+            "type": "array",
+            "items": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int32"
+            }
+          }
+        },
+        "description": "音频物理信息"
+      },
+      "PrivilegeLiteData": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "id": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "album_id": {
+            "type": "string"
+          },
+          "recommend_album_id": {
+            "type": "string"
+          },
+          "album_audio_id": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "hash": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "singername": {
+            "type": "string"
+          },
+          "albumname": {
+            "type": "string"
+          },
+          "level": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "quality": {
+            "type": "string",
+            "description": "音质标识：128, 320, flac, high, viper_atmos 等"
+          },
+          "privilege": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "权限标识。通常 8=免费，10=VIP/付费",
+            "format": "int32"
+          },
+          "status": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "pay_type": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "price": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "pkg_price": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "info": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PrivilegeAudioInfo"
+              }
+            ]
+          },
+          "trans_param": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PrivilegeTransParam"
+              }
+            ]
+          },
+          "_msg": {
+            "type": "string"
+          },
+          "_errno": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "relate_goods": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PrivilegeLiteData"
+            },
+            "description": "关联的其他音质商品（重点：这是一个递归结构，包含了 320k, flac, viper_atmos 等同结构数据）"
+          }
+        },
+        "description": "单个音质或单首歌曲的具体权限信息\r\n注意：酷狗的数据结构中，relate_goods 包含了同级结构的其他音质数据"
+      },
+      "PrivilegeQualityMap": {
+        "type": "object",
+        "properties": {
+          "attr0": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "attr1": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "bits": {
+            "type": "string"
+          }
+        }
+      },
+      "PrivilegeTransParam": {
+        "type": "object",
+        "properties": {
+          "cid": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "language": {
+            "type": "string"
+          },
+          "is_original": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "hash_multitrack": {
+            "type": "string"
+          },
+          "union_cover": {
+            "type": "string"
+          },
+          "ogg_128_hash": {
+            "type": "string"
+          },
+          "ogg_128_filesize": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "ogg_320_hash": {
+            "type": "string"
+          },
+          "ogg_320_filesize": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "format": "int64"
+          },
+          "classmap": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "additionalProperties": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int64"
+            }
+          },
+          "qualitymap": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/PrivilegeQualityMap"
+              }
+            ]
+          },
+          "ipmap": {
+            "type": [
+              "null",
+              "object"
+            ],
+            "additionalProperties": {
+              "pattern": "^-?(?:0|[1-9]\\d*)$",
+              "type": [
+                "integer",
+                "string"
+              ],
+              "format": "int64"
+            }
+          }
+        },
+        "description": "扩展转换参数 (包含各种 map 和备用 Hash)"
       },
       "ProblemDetails": {
         "type": "object",
@@ -9977,6 +10642,378 @@
           }
         },
         "description": "VIP 升级奖励领取结果。"
+      },
+      "UserCloudAlbumInfo": {
+        "type": "object",
+        "properties": {
+          "album_id": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "专辑 ID。",
+            "format": "int64"
+          },
+          "album_name": {
+            "type": "string",
+            "description": "专辑名。"
+          },
+          "publish_date": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "发布时间。"
+          },
+          "category": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "分类。",
+            "format": "int32"
+          },
+          "is_publish": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "是否已发布。",
+            "format": "int32"
+          },
+          "sizable_cover": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "专辑封面图。"
+          },
+          "status": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "error_code": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        },
+        "description": "云盘歌曲专辑信息。"
+      },
+      "UserCloudAuthor": {
+        "type": "object",
+        "properties": {
+          "author_id": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "歌手 ID。",
+            "format": "int64"
+          },
+          "author_name": {
+            "type": "string",
+            "description": "歌手名称。"
+          },
+          "sizable_avatar": {
+            "type": [
+              "null",
+              "string"
+            ],
+            "description": "歌手头像。"
+          },
+          "status": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "error_code": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        },
+        "description": "云盘歌曲歌手信息。"
+      },
+      "UserCloudResponse": {
+        "type": "object",
+        "properties": {
+          "list": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UserCloudSong"
+            },
+            "description": "当前页云盘歌曲列表。"
+          },
+          "list_count": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "云盘歌曲总数。",
+            "format": "int32"
+          },
+          "used_size": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "已使用空间，单位字节。",
+            "format": "int64"
+          },
+          "availble_size": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "剩余可用空间，单位字节。",
+            "format": "int64"
+          },
+          "max_size": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "云盘总容量，单位字节。",
+            "format": "int64"
+          },
+          "user_type": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "用户类型。",
+            "format": "int32"
+          },
+          "status": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "error_code": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        },
+        "description": "对应用户云盘接口的 data 节点。"
+      },
+      "UserCloudSong": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "歌曲名称。"
+          },
+          "hash": {
+            "type": "string",
+            "description": "歌曲 Hash。"
+          },
+          "hash_std": {
+            "type": "string",
+            "description": "标准音质 Hash。"
+          },
+          "audio_id": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "音频 ID。",
+            "format": "int64"
+          },
+          "album_audio_id": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "专辑音频 ID。",
+            "format": "int64"
+          },
+          "kmr_album_audio_id": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "KMR 专辑音频 ID。",
+            "format": "int64"
+          },
+          "author_name": {
+            "type": "string",
+            "description": "歌手名称，保留服务端聚合值。"
+          },
+          "authors": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/UserCloudAuthor"
+            },
+            "description": "歌手列表。"
+          },
+          "timelen": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "时长，单位为毫秒。",
+            "format": "int32"
+          },
+          "size": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "文件大小，单位字节。",
+            "format": "int64"
+          },
+          "bitrate": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "比特率等级。",
+            "format": "int32"
+          },
+          "ext": {
+            "type": "string",
+            "description": "扩展名。"
+          },
+          "add_time": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "添加时间戳。",
+            "format": "int64"
+          },
+          "kv_id": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "库内编号。",
+            "format": "int32"
+          },
+          "album_info": {
+            "oneOf": [
+              {
+                "type": "null"
+              },
+              {
+                "description": "专辑信息。",
+                "$ref": "#/components/schemas/UserCloudAlbumInfo"
+              }
+            ]
+          },
+          "status": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "error_code": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        },
+        "description": "单首云盘歌曲信息。"
+      },
+      "UserCloudUrlResponse": {
+        "type": "object",
+        "properties": {
+          "fileSize": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "integer",
+              "string"
+            ],
+            "description": "文件大小，单位字节。",
+            "format": "int64"
+          },
+          "url": {
+            "type": "string",
+            "description": "主下载地址。"
+          },
+          "backup_url": {
+            "type": "string",
+            "description": "备用下载地址。"
+          },
+          "extName": {
+            "type": "string",
+            "description": "文件扩展名。"
+          },
+          "hash": {
+            "type": "string",
+            "description": "歌曲 Hash。"
+          },
+          "status": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          },
+          "error_code": {
+            "pattern": "^-?(?:0|[1-9]\\d*)$",
+            "type": [
+              "null",
+              "integer",
+              "string"
+            ],
+            "format": "int32"
+          }
+        },
+        "description": "对应用户云盘歌曲直链接口的 data 节点。"
       },
       "UserDetailModel": {
         "type": "object",
