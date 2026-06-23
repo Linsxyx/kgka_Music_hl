@@ -529,6 +529,8 @@ class _PlaylistDetailPageState extends State<PlaylistDetailPage> {
   }
 
   /// 通过歌单 ID 导入并打开歌单详情。
+  /// 公开静态 API，供外部调用。
+  // ignore: unused_element
   static Future<void> importPlaylistById({
     required BuildContext context,
     required MusicApi api,
