@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../config/app_config.dart';
+import 'native_api_bridge.dart';
 
 class ApiException implements Exception {
   ApiException(this.message, {this.statusCode});
@@ -15,14 +16,39 @@ class ApiException implements Exception {
 }
 
 class ApiClient {
-  ApiClient({http.Client? client}) : _client = client ?? http.Client();
+  ApiClient({http.Client? client, NativeApiBridge? nativeBridge})
+    : _client = client ?? http.Client(),
+      _nativeBridge = nativeBridge ?? NativeApiBridge.tryLoad();
 
   final http.Client _client;
+  final NativeApiBridge? _nativeBridge;
+  bool get usesNativeBridge => _nativeBridge != null;
+  String? userId;
   String? token;
   String? t1;
   String? sessionId;
 
-  Future<dynamic> get(String path, [Map<String, Object?> query = const {}]) {
+  Future<dynamic> get(
+    String path, [
+    Map<String, Object?> query = const {},
+  ]) async {
+    final native = _nativeBridge;
+    if (native != null) {
+      try {
+        return unwrapData(
+          await native.request(
+            method: 'GET',
+            path: path,
+            query: query,
+            session: _nativeSession,
+          ),
+        );
+      } on NativeBridgeException catch (error) {
+        if (error.statusCode != 501) {
+          throw ApiException(error.message, statusCode: error.statusCode);
+        }
+      }
+    }
     return _sendWithRetry(
       () => _client.get(AppConfig.apiUri(path, query), headers: _headers),
     );
@@ -31,16 +57,34 @@ class ApiClient {
   /// 直接请求外部 URI（不经过 AppConfig.apiUri），返回原始 JSON。
   /// 用于跨平台 API 调用（如网易云 API）。
   Future<dynamic> getRaw(Uri uri) {
-    return _sendWithRetry(() => _client.get(uri, headers: {
-          'Accept': 'application/json',
-        }));
+    return _sendWithRetry(
+      () => _client.get(uri, headers: {'Accept': 'application/json'}),
+    );
   }
 
   Future<dynamic> post(
     String path, {
     Map<String, Object?> query = const {},
     Map<String, Object?>? body,
-  }) {
+  }) async {
+    final native = _nativeBridge;
+    if (native != null) {
+      try {
+        return unwrapData(
+          await native.request(
+            method: 'POST',
+            path: path,
+            query: query,
+            body: body,
+            session: _nativeSession,
+          ),
+        );
+      } on NativeBridgeException catch (error) {
+        if (error.statusCode != 501) {
+          throw ApiException(error.message, statusCode: error.statusCode);
+        }
+      }
+    }
     return _sendWithRetry(
       () => _client.post(
         AppConfig.apiUri(path, query),
@@ -56,19 +100,22 @@ class ApiClient {
       'Content-Type': 'application/json',
     };
 
-    if (token case final value?) {
-      //headers['Authorization'] = 'Bearer $value';
-      headers['X-Kg-Session-Id'] = value;
-    }
-    if (t1 case final value?) {
-      headers['t1'] = value;
-    }
-    if (sessionId case final value?) {
-      headers['X-Kg-Session-Id'] = value;
+    // Never send the KuGou token/t1 to the legacy Web API. NativeAOT receives
+    // them through the in-process request payload instead.
+    if (_nativeBridge == null) {
+      if (sessionId case final value?) {
+        headers['X-Kg-Session-Id'] = value;
+      }
     }
 
     return headers;
   }
+
+  Map<String, Object?> get _nativeSession => {
+    'userId': userId,
+    'token': token,
+    't1': t1,
+  };
 
   /// 带自动重试的请求发送。
   ///

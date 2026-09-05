@@ -48,6 +48,10 @@ class MainActivity : AudioServiceActivity() {
     private var pendingPermissionResult: MethodChannel.Result? = null
 
     companion object {
+        init {
+            System.loadLibrary("KuGou.Net.Native")
+        }
+
         private const val REQUEST_READ_AUDIO = 1001
         private const val TAG_SUPER_LYRIC = "SuperLyricPublisher"
         private const val TAG_BLUETOOTH_LYRICS = "BluetoothLyrics"

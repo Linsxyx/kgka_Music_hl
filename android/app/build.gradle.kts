@@ -115,6 +115,8 @@ configurations.all {
 }
 
 dependencies {
+    implementation(files("libs/libSystem.Security.Cryptography.Native.Android.jar"))
+
     // SuperLyricApi（https://github.com/HChenX/SuperLyricApi 3.4）
     // AAR 通过 JitPack 发布。JitPack 是"首次请求时才在服务器端懒构建"，
     // 所以把该依赖标记为 `changing = true`，配合上面的

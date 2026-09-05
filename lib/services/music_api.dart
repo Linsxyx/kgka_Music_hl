@@ -19,13 +19,21 @@ class MusicApi {
 
   void setSession(LoginSession? session) {
     if (session == null) {
+      _client.userId = null;
       _client.token = null;
       _client.t1 = null;
       _client.sessionId = null;
       return;
     }
+    _client.userId = session.userId;
     _client.token = session.token;
     _client.t1 = session.t1;
+    if (_client.usesNativeBridge) {
+      // Mobile NativeAOT owns the live session; never reuse a legacy Web API
+      // session key or send it back to the proxy server.
+      _client.sessionId = null;
+      return;
+    }
     // 扫码/手机号登录返回的 session 不携带 sessionId，
     // 此时 _client.sessionId 已由 ApiClient._processResponse 从
     // 登录请求的响应 header (X-Kg-Session-Id) 中保存。

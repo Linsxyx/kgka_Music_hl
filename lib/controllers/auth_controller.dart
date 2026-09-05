@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../config/app_config.dart';
@@ -11,7 +12,11 @@ import '../services/music_api.dart';
 import '../services/vip_background_task.dart';
 
 class AuthController extends ChangeNotifier {
-  AuthController(this._api, this._cacheService);
+  AuthController(
+    this._api,
+    this._cacheService, {
+    FlutterSecureStorage? credentialStorage,
+  }) : _credentialStorage = credentialStorage ?? const FlutterSecureStorage();
 
   static const _tokenKey = 'ka_music_token';
   static const _t1Key = 'ka_music_t1';
@@ -22,6 +27,7 @@ class AuthController extends ChangeNotifier {
   static const _likedHashesKey = 'ka_music_liked_hashes';
   final MusicApi _api;
   final CacheService _cacheService;
+  final FlutterSecureStorage _credentialStorage;
   late final VipBackgroundTask _vipBackgroundTask = VipBackgroundTask(_api);
 
   bool isRestoring = true;
@@ -195,9 +201,9 @@ class AuthController extends ChangeNotifier {
       final storedUserId = prefs.getString(_userIdKey);
       final restored = LoginSession(
         userId: storedUserId,
-        token: prefs.getString(_tokenKey),
-        t1: prefs.getString(_t1Key),
-        sessionId: prefs.getString(_sessionIdKey),
+        token: await _readCredential(prefs, _tokenKey),
+        t1: await _readCredential(prefs, _t1Key),
+        sessionId: await _readCredential(prefs, _sessionIdKey),
       );
 
       if (!restored.isValid) {
@@ -217,8 +223,8 @@ class AuthController extends ChangeNotifier {
         }
         session = refreshed;
         _api.setSession(refreshed);
-        await prefs.setString(_tokenKey, refreshed.token ?? '');
-        await prefs.setString(_t1Key, refreshed.t1 ?? '');
+        await _writeCredential(prefs, _tokenKey, refreshed.token);
+        await _writeCredential(prefs, _t1Key, refreshed.t1);
         await prefs.setString(_userIdKey, refreshed.userId ?? '');
       } catch (_) {
         // /login/token failed, continue with stored token
@@ -272,8 +278,8 @@ class AuthController extends ChangeNotifier {
       }
       session = refreshed;
       _api.setSession(refreshed);
-      await prefs.setString(_tokenKey, refreshed.token ?? '');
-      await prefs.setString(_t1Key, refreshed.t1 ?? '');
+      await _writeCredential(prefs, _tokenKey, refreshed.token);
+      await _writeCredential(prefs, _t1Key, refreshed.t1);
       await prefs.setString(_userIdKey, refreshed.userId ?? '');
     } catch (_) {
       // Refresh failed, continue with existing session
@@ -290,11 +296,11 @@ class AuthController extends ChangeNotifier {
       _api.setSession(session);
 
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_tokenKey, session.token ?? '');
-      await prefs.setString(_t1Key, session.t1 ?? '');
+      await _writeCredential(prefs, _tokenKey, session.token);
+      await _writeCredential(prefs, _t1Key, session.t1);
       // session.sessionId 可能为 null（扫码登录），但 ApiClient 内部
       // 已从登录响应 header 保存了后端的 session key，这里也持久化一份。
-      await prefs.setString(_sessionIdKey, _api.clientSessionId ?? '');
+      await _writeCredential(prefs, _sessionIdKey, _api.clientSessionId);
       await prefs.setString(_userIdKey, session.userId ?? '');
 
       // 扫码登录返回的 QrLoginStatusResponse 只有 token，缺少 t1。
@@ -315,9 +321,9 @@ class AuthController extends ChangeNotifier {
             );
             this.session = session;
             _api.setSession(session);
-            await prefs.setString(_tokenKey, session.token ?? '');
-            await prefs.setString(_t1Key, session.t1 ?? '');
-            await prefs.setString(_sessionIdKey, _api.clientSessionId ?? '');
+            await _writeCredential(prefs, _tokenKey, session.token);
+            await _writeCredential(prefs, _t1Key, session.t1);
+            await _writeCredential(prefs, _sessionIdKey, _api.clientSessionId);
             await prefs.setString(_userIdKey, session.userId ?? '');
           }
         } catch (_) {
@@ -360,10 +366,10 @@ class AuthController extends ChangeNotifier {
       _api.setSession(nextSession);
 
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_tokenKey, nextSession.token ?? '');
-      await prefs.setString(_t1Key, nextSession.t1 ?? '');
+      await _writeCredential(prefs, _tokenKey, nextSession.token);
+      await _writeCredential(prefs, _t1Key, nextSession.t1);
       // nextSession.sessionId 可能为 null，用 ApiClient 实际持有的 session key
-      await prefs.setString(_sessionIdKey, _api.clientSessionId ?? '');
+      await _writeCredential(prefs, _sessionIdKey, _api.clientSessionId);
       await prefs.setString(_userIdKey, nextSession.userId ?? '');
 
       await refreshProfile(silent: true);
@@ -396,9 +402,9 @@ class AuthController extends ChangeNotifier {
         playlists = const [];
         _likedHashes.clear();
         _api.setSession(null);
-        await prefs.remove(_tokenKey);
-        await prefs.remove(_t1Key);
-        await prefs.remove(_sessionIdKey);
+        await _deleteCredential(prefs, _tokenKey);
+        await _deleteCredential(prefs, _t1Key);
+        await _deleteCredential(prefs, _sessionIdKey);
         await prefs.remove(_userIdKey);
         await prefs.remove(cacheKey);
         await prefs.remove(emptyCountKey);
@@ -525,6 +531,52 @@ class AuthController extends ChangeNotifier {
   String get _playlistCacheKeyV2 =>
       'cache_user_playlists_${session?.userId ?? 'default'}';
 
+  Future<String?> _readCredential(SharedPreferences prefs, String key) async {
+    try {
+      final secureValue = await _credentialStorage.read(key: key);
+      if (secureValue != null && secureValue.isNotEmpty) {
+        return secureValue;
+      }
+
+      // One-time migration from the old SharedPreferences storage.
+      final legacyValue = prefs.getString(key);
+      if (legacyValue != null && legacyValue.isNotEmpty) {
+        await _credentialStorage.write(key: key, value: legacyValue);
+        await prefs.remove(key);
+        return legacyValue;
+      }
+    } catch (_) {
+      // Secure storage may be unavailable on an unsupported desktop runtime.
+      return prefs.getString(key);
+    }
+    return null;
+  }
+
+  Future<void> _writeCredential(
+    SharedPreferences prefs,
+    String key,
+    String? value,
+  ) async {
+    final normalized = value == null || value.isEmpty ? null : value;
+    try {
+      await _credentialStorage.write(key: key, value: normalized);
+      await prefs.remove(key);
+    } catch (_) {
+      if (normalized == null) {
+        await prefs.remove(key);
+      } else {
+        await prefs.setString(key, normalized);
+      }
+    }
+  }
+
+  Future<void> _deleteCredential(SharedPreferences prefs, String key) async {
+    try {
+      await _credentialStorage.delete(key: key);
+    } catch (_) {}
+    await prefs.remove(key);
+  }
+
   Future<void> _clearSession() async {
     final prefs = await SharedPreferences.getInstance();
     session = null;
@@ -532,8 +584,9 @@ class AuthController extends ChangeNotifier {
     playlists = const [];
     _likedHashes.clear();
     _api.setSession(null);
-    await prefs.remove(_tokenKey);
-    await prefs.remove(_t1Key);
+    await _deleteCredential(prefs, _tokenKey);
+    await _deleteCredential(prefs, _t1Key);
+    await _deleteCredential(prefs, _sessionIdKey);
     await prefs.remove(_userIdKey);
     await prefs.remove(_playlistCacheKey);
     await prefs.remove(_playlistEmptyCountKey);
