@@ -10,6 +10,7 @@ import '../../models/music_models.dart';
 import '../../services/music_api.dart';
 import '../widgets/artwork.dart';
 import '../widgets/toast.dart';
+import '../widgets/import_playlist_sheet.dart';
 import 'cloud_drive_page.dart';
 import 'downloaded_songs_page.dart';
 import 'playback_history_page.dart';
@@ -373,6 +374,18 @@ class _LibraryPageState extends State<LibraryPage> {
                     ),
                   ),
 
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(18, 12, 18, 0),
+                      child: OutlinedButton.icon(
+                        onPressed: () => showImportPlaylistSheet(
+                          context: context, api: widget.api, auth: widget.auth,
+                        ),
+                        icon: const Icon(Icons.playlist_add_rounded),
+                        label: const Text('导入 QQ / 网易云歌单'),
+                      ),
+                    ),
+                  ),
                   const SliverToBoxAdapter(child: SizedBox(height: 20)),
 
                   // 4. 折叠分组 1：我创建的歌单

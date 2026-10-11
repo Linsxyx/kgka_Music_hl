@@ -195,6 +195,11 @@ class AuthController extends ChangeNotifier {
     });
   }
 
+  Future<void> refreshImportedPlaylist(PlaylistSummary playlist) async {
+    await _invalidatePlaylistDetailCache(playlist);
+    await refreshProfile(silent: true);
+  }
+
   Future<void> deleteOrUncollectPlaylist(PlaylistSummary playlist) async {
     final target = findUserPlaylist(playlist) ?? playlist;
     final listId = _playlistListId(target);
