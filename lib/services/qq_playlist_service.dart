@@ -10,7 +10,11 @@ class QqPlaylistService {
 
   final http.Client _client;
   static const _timeout = Duration(seconds: 15);
-  static const _headers = {'Referer': 'https://y.qq.com/'};
+  static const _headers = {
+    'Referer': 'https://y.qq.com/',
+    'User-Agent':
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+  };
 
   static Uri? shareUri(String text) {
     for (final match in RegExp(
@@ -30,10 +34,10 @@ class QqPlaylistService {
   static String? _playlistId(Uri uri) {
     final id =
         uri.queryParameters['disstid'] ??
-        (RegExp(r'playlist|taoge').hasMatch(uri.path)
+        (RegExp(r'playlist|taoge|playsquare').hasMatch(uri.path)
             ? uri.queryParameters['id']
             : null) ??
-        RegExp(r'/playlist/(\d+)').firstMatch(uri.path)?.group(1);
+        RegExp(r'/(?:playlist|playsquare)/(\d+)').firstMatch(uri.path)?.group(1);
     return id != null && RegExp(r'^\d+$').hasMatch(id) ? id : null;
   }
 

@@ -215,7 +215,6 @@ class LocalMusicController extends ChangeNotifier {
 
   /// 获取本地歌曲的内嵌歌词。
   Future<String?> getEmbeddedLyrics(String filePath) async {
-    if (!Platform.isAndroid) return null;
     try {
       return await compute(readEmbeddedLyricsMetadata, filePath);
     } catch (e) {

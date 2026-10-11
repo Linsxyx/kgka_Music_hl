@@ -33,7 +33,7 @@ class LocalLyricsService {
   Future<List<LyricLine>> load(Song song) async {
     final file = File(song.id);
     final dot = file.path.lastIndexOf('.');
-    final slash = file.path.lastIndexOf(Platform.pathSeparator);
+    final slash = file.path.lastIndexOf(RegExp(r'[/\\]'));
     final stem = dot > slash ? file.path.substring(0, dot) : file.path;
     for (final extension in ['.lrc', '.LRC']) {
       try {

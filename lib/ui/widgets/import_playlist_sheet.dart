@@ -122,6 +122,15 @@ class _ImportPlaylistSheetState extends State<ImportPlaylistSheet> {
             break;
           }
         }
+        if (target == null) {
+          for (final playlist in _targetPlaylists) {
+            if (!previousIds.contains(playlist.listId)) {
+              target = playlist;
+              _selectedListId = playlist.listId!;
+              break;
+            }
+          }
+        }
       } else {
         for (final playlist in _targetPlaylists) {
           if (playlist.listId == _selectedListId) target = playlist;
