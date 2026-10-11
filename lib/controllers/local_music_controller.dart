@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../core/folder_filter.dart';
 import '../models/music_models.dart';
+import '../services/local_lyrics_service.dart';
 
 class LocalMusicController extends ChangeNotifier {
   LocalMusicController() {
@@ -216,10 +217,7 @@ class LocalMusicController extends ChangeNotifier {
   Future<String?> getEmbeddedLyrics(String filePath) async {
     if (!Platform.isAndroid) return null;
     try {
-      return await _channel.invokeMethod<String>(
-        'getEmbeddedLyrics',
-        {'filePath': filePath},
-      );
+      return await compute(readEmbeddedLyricsMetadata, filePath);
     } catch (e) {
       debugPrint('Error getting embedded lyrics: $e');
       return null;

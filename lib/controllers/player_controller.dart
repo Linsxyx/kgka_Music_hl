@@ -15,6 +15,7 @@ import '../services/audio_effects_service.dart';
 import '../services/cache_service.dart';
 import '../services/desktop_lyrics_service.dart';
 import '../services/music_api.dart';
+import '../services/local_lyrics_service.dart';
 import '../services/music_audio_handler.dart';
 import '../services/bluetooth_lyrics_service.dart';
 import '../services/playback_history_service.dart';
@@ -910,51 +911,13 @@ class PlayerController extends ChangeNotifier {
     final cacheKey = 'cache_lyric_${song.hash}';
 
     if (song.source == SongSource.local) {
-      // 1. 优先尝试同名 .lrc 文件
-      try {
-        final songFile = File(song.id);
-        final dotIndex = songFile.path.lastIndexOf('.');
-        final lrcPath =
-            '${dotIndex != -1 ? songFile.path.substring(0, dotIndex) : songFile.path}.lrc';
-        final file = File(lrcPath);
-        if (await file.exists()) {
-          final bytes = await file.readAsBytes();
-          String content;
-          try {
-            content = utf8.decode(bytes);
-          } catch (_) {
-            content = utf8.decode(bytes, allowMalformed: true);
-          }
-          final lines = parseLyrics(content);
-          if (currentSong?.hash == song.hash) {
-            lyrics = lines;
-            notifyListeners();
-            _syncDesktopLyrics();
-          }
-          return;
-        }
-      } catch (e) {
-        debugPrint('Failed to load local .lrc lyrics: $e');
-      }
-
-      // 2. 尝试从音频文件内嵌元数据读取歌词
-      try {
-        final embedded = await localMusic?.getEmbeddedLyrics(song.id);
-        if (embedded != null && embedded.isNotEmpty) {
-          final lines = parseLyrics(embedded);
-          if (currentSong?.hash == song.hash) {
-            lyrics = lines;
-            notifyListeners();
-            _syncDesktopLyrics();
-          }
-          return;
-        }
-      } catch (e) {
-        debugPrint('Failed to load embedded lyrics: $e');
-      }
-
+      final lines = await LocalLyricsService(
+        api: _api,
+        cache: cache,
+        embeddedLyricsReader: localMusic?.getEmbeddedLyrics,
+      ).load(song);
       if (currentSong?.hash == song.hash) {
-        lyrics = const [];
+        lyrics = lines;
         notifyListeners();
         _syncDesktopLyrics();
       }

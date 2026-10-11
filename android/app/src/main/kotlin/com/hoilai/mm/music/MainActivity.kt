@@ -234,20 +234,6 @@ class MainActivity : AudioServiceActivity() {
                             result.error("album_art_failed", error.message, null)
                         }
                     }
-                    "getEmbeddedLyrics" -> {
-                        val filePath = call.argument<String>("filePath")
-                        if (filePath.isNullOrEmpty()) {
-                            result.success(null)
-                            return@setMethodCallHandler
-                        }
-                        runCatching {
-                            getEmbeddedLyrics(filePath)
-                        }.onSuccess { lyrics ->
-                            result.success(lyrics)
-                        }.onFailure { error ->
-                            result.error("lyrics_failed", error.message, null)
-                        }
-                    }
                     else -> result.notImplemented()
                 }
             }
@@ -1038,19 +1024,6 @@ class MainActivity : AudioServiceActivity() {
         )
         return try {
             contentResolver.openInputStream(uri)?.use { it.readBytes() }
-        } catch (e: Exception) {
-            null
-        }
-    }
-
-    private fun getEmbeddedLyrics(filePath: String): String? {
-        return try {
-            val retriever = android.media.MediaMetadataRetriever()
-            retriever.setDataSource(filePath)
-            // METADATA_KEY_LYRICS = 26，API 29+ 才有常量名，直接用数字 key 兼容旧版本
-            val lyrics = retriever.extractMetadata(26)
-            retriever.release()
-            lyrics
         } catch (e: Exception) {
             null
         }
