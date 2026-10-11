@@ -1,11 +1,13 @@
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 
 import '../config/app_config.dart';
 import '../core/api_client.dart';
 import '../models/app_version.dart';
 import '../models/music_models.dart';
+import 'qq_playlist_service.dart';
 
 class MusicApi {
   MusicApi(this._client);
@@ -701,6 +703,15 @@ class MusicApi {
   Future<ExternalPlaylistParseResult> parseExternalPlaylist(
     String sourceText,
   ) async {
+    final qqUri = QqPlaylistService.shareUri(sourceText);
+    if (qqUri != null) {
+      final client = http.Client();
+      try {
+        return await QqPlaylistService(client).load(qqUri);
+      } finally {
+        client.close();
+      }
+    }
     final json = asMap(
       await _client.post(
         '/playlist/external/parse',
@@ -711,10 +722,11 @@ class MusicApi {
   }
 
   Future<void> createPlaylist(String name, {bool private = false}) async {
-    await _client.post(
+    final result = await _client.post(
       '/playlist/create',
       query: {'name': name, 'type': private ? 1 : 0},
     );
+    _checkPlaylistMutation(result);
   }
 
   Future<void> collectPlaylist({
@@ -737,10 +749,19 @@ class MusicApi {
 
   Future<void> addSongsToPlaylist(String listId, List<Song> songs) async {
     if (songs.isEmpty) return;
-    await _client.post(
+    final result = await _client.post(
       '/playlist/tracks/add',
       body: {'listId': listId, 'songs': songs.map(_songAddPayload).toList()},
     );
+    _checkPlaylistMutation(result);
+  }
+
+  void _checkPlaylistMutation(dynamic result) {
+    final json = asMap(result);
+    if (asInt(json['status']) == 0 || json['success'] == false ||
+        (json['code'] != null && ![0, 200].contains(asInt(json['code'])))) {
+      throw ApiException('歌单操作失败${_failureSuffix(json)}');
+    }
   }
 
   Future<void> removeFromPlaylist(String listId, Song song) async {
