@@ -1377,7 +1377,8 @@ class LyricWord {
     return LyricWord(
       time: Duration(milliseconds: asInt(json['timeMs']) ?? 0),
       duration: Duration(milliseconds: asInt(json['durationMs']) ?? 0),
-      text: asString(json['text']) ?? '',
+      // Spaces may be timed KRC words; trimming them changes cached lyrics.
+      text: json['text']?.toString() ?? '',
     );
   }
 }
