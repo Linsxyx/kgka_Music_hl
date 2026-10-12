@@ -10,6 +10,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../core/shuffle_cycle.dart';
 import '../models/music_models.dart';
 import '../services/audio_effects_service.dart';
 import '../services/cache_service.dart';
@@ -204,7 +205,7 @@ class PlayerController extends ChangeNotifier {
   // 平滑位置的上一次取值：用于过滤位置流的小幅倒退（音频缓冲/时钟抖动），
   // 避免歌词高亮和卡拉OK进度出现回跳。seek/换歌的大跨度回退会重建基线。
   Duration _lastSmoothPosition = Duration.zero;
-  final _random = math.Random();
+  final _shuffleCycle = ShuffleCycle<String>();
   /// 高潮试听结束时间（播放到该时间自动暂停）。
   Duration? _climaxEndTime;
 
@@ -366,6 +367,7 @@ class PlayerController extends ChangeNotifier {
   }
 
   PlaybackMode cyclePlaybackMode() {
+    _shuffleCycle.clear();
     playbackMode = switch (playbackMode) {
       PlaybackMode.playlistLoop => PlaybackMode.shuffle,
       PlaybackMode.shuffle => PlaybackMode.singleLoop,
@@ -428,11 +430,22 @@ class PlayerController extends ChangeNotifier {
     isPreparing = true;
     _isChangingSource = true;
     errorMessage = null;
+    final replacesQueue =
+        queue != null && queue.isNotEmpty && !identical(queue, this.queue);
     currentSong = song;
     if (queue != null && queue.isNotEmpty) {
       this.queue = queue;
     } else if (this.queue.isEmpty) {
       this.queue = [song];
+    }
+    final songIdentity = _songIdentity(song);
+    if (replacesQueue) {
+      _shuffleCycle.reset(
+        this.queue.map(_songIdentity).where((identity) => identity.isNotEmpty),
+        current: songIdentity,
+      );
+    } else if (songIdentity.isNotEmpty) {
+      _shuffleCycle.markPlayed(songIdentity);
     }
     lyrics = const [];
     _lastDesktopLyricIndex = -1;
@@ -2025,15 +2038,18 @@ class PlayerController extends ChangeNotifier {
       return null;
     }
     if (playbackMode == PlaybackMode.shuffle) {
-      if (queue.length == 1) return queue.first;
-
-      var nextIndex = _random.nextInt(queue.length);
-      if (index >= 0) {
-        while (nextIndex == index) {
-          nextIndex = _random.nextInt(queue.length);
-        }
-      }
-      return queue[nextIndex];
+      final currentIdentity = currentSong == null
+          ? null
+          : _songIdentity(currentSong!);
+      final nextIdentity = _shuffleCycle.next(
+        queue.map(_songIdentity).where((identity) => identity.isNotEmpty),
+        current: currentIdentity,
+      );
+      if (nextIdentity == null) return currentSong;
+      return queue.firstWhere(
+        (song) => _songIdentity(song) == nextIdentity,
+        orElse: () => currentSong ?? queue.first,
+      );
     }
 
     if (index >= 0 && index < queue.length - 1) {
