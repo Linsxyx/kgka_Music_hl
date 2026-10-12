@@ -224,6 +224,20 @@ class _PlaylistDetailPageState extends State<PlaylistDetailPage> {
   }
 
   Future<void>? _allSongsFuture;
+  Future<List<Song>>? _freshPlaybackQueueFuture;
+
+  String get _fullSongsCacheKey => _isAlbum
+      ? 'cache_album_${widget.playlist.albumId ?? widget.playlist.id}$_fullSongsCacheSuffix'
+      : 'cache_playlist_${widget.playlist.id}$_fullSongsCacheSuffix';
+
+  Future<List<Song>> _requestAllSongs() {
+    final id = _isAlbum
+        ? (widget.playlist.albumId ?? widget.playlist.id)
+        : widget.playlist.id;
+    return _isAlbum
+        ? widget.api.albumSongs(id, page: 1, pageSize: 5000)
+        : widget.api.playlistSongs(id, fetchAll: true);
+  }
 
   /// 加载完整歌单（已加载/正在加载时复用同一个 Future）。
   Future<void> _loadAllSongs() {
@@ -234,19 +248,11 @@ class _PlaylistDetailPageState extends State<PlaylistDetailPage> {
   Future<void> _fetchAllSongs() async {
     setState(() => _isLoadingAllSongs = true);
     try {
-      final id = _isAlbum
-          ? (widget.playlist.albumId ?? widget.playlist.id)
-          : widget.playlist.id;
-
       // 优先尝试从完整歌单缓存读取（命中则跳过网络请求）
-      final fullCacheKey = _isAlbum
-          ? 'cache_album_${widget.playlist.albumId ?? widget.playlist.id}$_fullSongsCacheSuffix'
-          : 'cache_playlist_${widget.playlist.id}$_fullSongsCacheSuffix';
-
       CacheResult<Map<String, dynamic>>? fullCached;
       try {
         fullCached = await _cache.read<Map<String, dynamic>>(
-          fullCacheKey,
+          _fullSongsCacheKey,
           decode: (json) => json,
           ttl: AppConfig.playlistDetailTtl,
         );
@@ -260,11 +266,9 @@ class _PlaylistDetailPageState extends State<PlaylistDetailPage> {
             .where((song) => song.hash.isNotEmpty)
             .toList();
       } else {
-        allSongs = _isAlbum
-            ? await widget.api.albumSongs(id, page: 1, pageSize: 5000)
-            : await widget.api.playlistSongs(id, fetchAll: true);
+        allSongs = await _requestAllSongs();
         // 写入完整歌单缓存，后续播放可直接复用
-        await _cache.write(fullCacheKey, {
+        await _cache.write(_fullSongsCacheKey, {
           'songs': allSongs.map((s) => s.toCache()).toList(),
         });
       }
@@ -403,10 +407,14 @@ class _PlaylistDetailPageState extends State<PlaylistDetailPage> {
   /// 当歌单因分页仅加载前 N 首时，对比播放队列与歌单总歌曲数量。
   /// 若不一致则自动获取完整歌单数据（优先读缓存），保障播放队列完整。
   /// 搜索模式下仅返回过滤后的结果。
-  Future<List<Song>> _ensureFullQueueForPlayback() async {
+  Future<List<Song>> _ensureFullQueueForPlayback({bool refresh = false}) async {
     // 搜索模式下仅播放搜索结果
     if (_searchQuery.isNotEmpty) {
       return _filteredSongs;
+    }
+    if (refresh && !_isStaticCollection) {
+      return _freshPlaybackQueueFuture ??= _refreshFullQueueForPlayback()
+          .whenComplete(() => _freshPlaybackQueueFuture = null);
     }
     // 已加载全部或总数未知，直接返回当前列表
     final totalCount = _currentPlaylist.songCount;
@@ -417,6 +425,42 @@ class _PlaylistDetailPageState extends State<PlaylistDetailPage> {
     Toast.info('正在加载完整歌单…');
     await _loadAllSongs();
     return _filteredSongs;
+  }
+
+  /// “播放全部”始终从服务端重新获取完整列表并整体替换本地内容。
+  ///
+  /// 这里不读取完整歌单缓存，也不做增量追加，确保已在其他入口删除的
+  /// 歌曲不会继续残留在新的播放队列中。
+  Future<List<Song>> _refreshFullQueueForPlayback() async {
+    if (mounted) setState(() => _isLoadingAllSongs = true);
+    try {
+      final allSongs = await _requestAllSongs();
+      if (!mounted) return const [];
+
+      setState(() {
+        _songs
+          ..clear()
+          ..addAll(allSongs);
+        _allSongsLoaded = true;
+        _hasMore = false;
+        _isLoadingAllSongs = false;
+        _loadMoreError = null;
+      });
+      try {
+        await _cache.write(_fullSongsCacheKey, {
+          'songs': allSongs.map((song) => song.toCache()).toList(),
+        });
+      } catch (_) {
+        // 缓存写入失败不应阻止已刷新到的最新歌单开始播放。
+      }
+      return _filteredSongs;
+    } catch (_) {
+      if (mounted) {
+        setState(() => _isLoadingAllSongs = false);
+        Toast.error('刷新歌单失败，请检查网络后重试');
+      }
+      return const [];
+    }
   }
 
   Future<void> _loadInitial() async {
@@ -791,14 +835,77 @@ class _PlaylistDetailPageState extends State<PlaylistDetailPage> {
   }
 
   Future<void> _removeSong(Song song) async {
-    final confirmed = await _confirm(title: '删除歌曲', message: '从当前歌单删除这首歌？');
-    if (confirmed != true) return;
-    await _runMutation(() async {
-      await widget.auth.removeSongFromPlaylist(_libraryPlaylist, song);
-      if (mounted) {
-        setState(() => _songs.removeWhere((item) => item.id == song.id));
+    final downloads = widget.player.downloadController;
+    final choice = await _confirmSongRemoval(
+      isDownloaded: downloads?.isDownloaded(song) == true,
+    );
+    if (choice == null) return;
+
+    final removed = await _runMutation(
+      () => widget.auth.removeSongFromPlaylist(_libraryPlaylist, song),
+      showSuccessToast: false,
+    );
+    if (!removed) return;
+
+    if (mounted) {
+      setState(() => _songs.removeWhere((item) => item.id == song.id));
+    }
+
+    if (choice == _SongRemovalChoice.playlistAndDownload) {
+      try {
+        await downloads!.deleteDownload(song);
+        Toast.success('已从歌单删除，并删除本地文件');
+      } catch (error) {
+        Toast.error('已从歌单删除，但本地文件删除失败：$error');
       }
-    });
+    } else {
+      Toast.success('已从歌单删除');
+    }
+  }
+
+  Future<_SongRemovalChoice?> _confirmSongRemoval({
+    required bool isDownloaded,
+  }) {
+    if (!isDownloaded) {
+      return _confirm(title: '删除歌曲', message: '从当前歌单删除这首歌？').then(
+        (confirmed) => confirmed == true
+            ? _SongRemovalChoice.playlistOnly
+            : null,
+      );
+    }
+
+    return showDialog<_SongRemovalChoice>(
+      context: context,
+      builder: (dialogContext) {
+        final colorScheme = Theme.of(dialogContext).colorScheme;
+        return AlertDialog(
+          title: const Text('删除歌曲'),
+          content: const Text('这首歌已下载到本地，是否同时删除本地文件？'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('取消'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(
+                _SongRemovalChoice.playlistOnly,
+              ),
+              child: const Text('仅从歌单删除'),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: colorScheme.error,
+                foregroundColor: colorScheme.onError,
+              ),
+              onPressed: () => Navigator.of(dialogContext).pop(
+                _SongRemovalChoice.playlistAndDownload,
+              ),
+              child: const Text('同时删除'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Future<void> _addSongToPlaylist(Song song) async {
@@ -964,17 +1071,24 @@ class _PlaylistDetailPageState extends State<PlaylistDetailPage> {
     );
   }
 
-  Future<void> _runMutation(Future<void> Function() action) async {
-    if (_isMutating) return;
+  Future<bool> _runMutation(
+    Future<void> Function() action, {
+    bool showSuccessToast = true,
+  }) async {
+    if (_isMutating) return false;
     setState(() => _isMutating = true);
     try {
       await action();
       if (widget.auth.errorMessage != null) {
         throw Exception(widget.auth.errorMessage);
       }
-      Toast.success('操作完成');
+      if (showSuccessToast) {
+        Toast.success('操作完成');
+      }
+      return true;
     } catch (error) {
       Toast.error('操作失败：$error');
+      return false;
     } finally {
       if (mounted) {
         setState(() => _isMutating = false);
@@ -1149,14 +1263,18 @@ class _PlaylistDetailPageState extends State<PlaylistDetailPage> {
               else ...[
                 SliverToBoxAdapter(
                   child: _Actions(
-                    count: _info?.songCount ?? _songs.length,
+                    count: _allSongsLoaded
+                        ? _songs.length
+                        : _info?.songCount ?? _songs.length,
                     loadedCount: _songs.length,
                     sortLabel: _sortModeLabel,
                     onSortTap: () => _showSortSheet(context),
                     onPlay: _filteredSongs.isEmpty
                         ? null
                         : () async {
-                            final queue = await _ensureFullQueueForPlayback();
+                            final queue = await _ensureFullQueueForPlayback(
+                              refresh: true,
+                            );
                             if (!mounted || queue.isEmpty) return;
                             widget.player.playSong(
                               queue.first,
@@ -2088,6 +2206,11 @@ enum _SongSortMode {
   byTitle,
   byArtist,
   byAlbum,
+}
+
+enum _SongRemovalChoice {
+  playlistOnly,
+  playlistAndDownload,
 }
 
 class _SortOptionTile extends StatelessWidget {
