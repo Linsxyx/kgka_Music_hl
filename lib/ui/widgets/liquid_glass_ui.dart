@@ -1,6 +1,7 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../design_tokens.dart';
+import '../../controllers/theme_controller.dart';
 
 /// 全局流体极光氛围底层背景（iOS 26 Ambient Mesh Background）。
 /// 采用全屏平滑弥散光晕，消除任何高度截断与局部断层。
@@ -31,7 +32,7 @@ class LiquidGlassBackground extends StatelessWidget {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          if (showOrbs)
+          if (showOrbs && ThemeController.instance.liquidGlassEnabled)
             RepaintBoundary(
               child: Stack(
                 fit: StackFit.expand,
@@ -178,7 +179,8 @@ class _LiquidGlassCardState extends State<LiquidGlassCard> {
       );
     }
 
-    final hasBlur = widget.blurSigma > 0;
+    final isLiquidGlass = ThemeController.instance.liquidGlassEnabled;
+    final hasBlur = isLiquidGlass && widget.blurSigma > 0;
     final cardDecoration = BoxDecoration(
       color: effectiveBgColor,
       borderRadius: BorderRadius.circular(widget.borderRadius),
@@ -304,7 +306,8 @@ class _LiquidGlassCapsuleState extends State<LiquidGlassCapsule> {
       );
     }
 
-    final hasBlur = widget.blurSigma > 0;
+    final isLiquidGlass = ThemeController.instance.liquidGlassEnabled;
+    final hasBlur = isLiquidGlass && widget.blurSigma > 0;
     final capsuleDecoration = BoxDecoration(
       color: effectiveBgColor,
       borderRadius: BorderRadius.circular(100),

@@ -752,7 +752,9 @@ class _LiquidGlassBottomBar extends StatelessWidget {
           child: ClipRRect(
             borderRadius: BorderRadius.circular(100),
             child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
+              filter: ThemeController.instance.liquidGlassEnabled
+                  ? ImageFilter.blur(sigmaX: 28, sigmaY: 28)
+                  : ImageFilter.blur(sigmaX: 0, sigmaY: 0),
               child: DecoratedBox(
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(100),

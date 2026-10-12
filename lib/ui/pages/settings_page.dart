@@ -376,6 +376,15 @@ class SettingsPage extends StatelessWidget {
                       value: player.lyricBlurEnabled,
                       onChanged: player.setLyricBlurEnabled,
                     ),
+                    _SettingsDivider(),
+                    _SettingsSwitchTile(
+                      icon: Icons.sports_esports_rounded,
+                      iconColor: colorScheme.primary,
+                      title: '播放页音乐游戏',
+                      subtitle: '在播放页右下角显示节奏小游戏入口（关闭后可防误触）',
+                      value: player.playerGameEnabled,
+                      onChanged: player.setPlayerGameEnabled,
+                    ),
                     if (player.isDesktopLyricsSupported) ...[
                       _SettingsDivider(),
                       _SettingsSwitchTile(
@@ -494,6 +503,15 @@ class SettingsPage extends StatelessWidget {
                       subtitle: '横屏时使用左侧播放面板布局并放大文字',
                       value: theme.carModeEnabled,
                       onChanged: (value) => theme.setCarModeEnabled(value),
+                    ),
+                    _SettingsDivider(),
+                    _SettingsSwitchTile(
+                      icon: Icons.blur_linear_rounded,
+                      iconColor: colorScheme.primary,
+                      title: '液态玻璃动效',
+                      subtitle: '全屏流体极光与悬浮磨砂质感（若翻动歌词或界面掉帧建议关闭）',
+                      value: theme.liquidGlassEnabled,
+                      onChanged: (value) => theme.setLiquidGlassEnabled(value),
                     ),
                   ],
                 ),

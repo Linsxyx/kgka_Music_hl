@@ -37,5 +37,19 @@ void main() {
       expect(reloadedController.themeModeLabel, '浅色模式');
       expect(prefs.getString('theme.mode'), 'light');
     });
+    test('液态玻璃开关默认开启并支持切换与持久化', () async {
+      final controller = ThemeController();
+      expect(controller.liquidGlassEnabled, isTrue);
+
+      await controller.setLiquidGlassEnabled(false);
+      expect(controller.liquidGlassEnabled, isFalse);
+
+      final prefs = await SharedPreferences.getInstance();
+      expect(prefs.getBool('theme.liquid_glass_enabled'), isFalse);
+
+      final reloaded = ThemeController();
+      await reloaded.load();
+      expect(reloaded.liquidGlassEnabled, isFalse);
+    });
   });
 }

@@ -154,7 +154,12 @@ class _PlayerPageState extends State<PlayerPage> {
                   ),
                   onTap: () {
                     Navigator.of(context).pop();
-                    widget.player.playSong(song, queue: widget.player.queue);
+                    widget.player.playSong(
+                      song,
+                      queue: widget.player.queue,
+                      preservePersonalFmSession:
+                          widget.player.isPersonalFmActive,
+                    );
                   },
                 );
               },
@@ -485,17 +490,27 @@ class _ArtworkBackgroundState extends State<_ArtworkBackground>
                   child: RotationTransition(
                     turns: _rotationController,
                     child: RepaintBoundary(
-                      child: ImageFiltered(
-                        imageFilter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
-                        child: Image.network(
-                          coverUrl,
-                          fit: BoxFit.cover,
-                          cacheWidth: 360,
-                          cacheHeight: 360,
-                          errorBuilder: (context, error, stackTrace) =>
-                              const SizedBox.shrink(),
-                        ),
-                      ),
+                      child: ThemeController.instance.liquidGlassEnabled
+                          ? ImageFiltered(
+                              imageFilter:
+                                  ImageFilter.blur(sigmaX: 28, sigmaY: 28),
+                              child: Image.network(
+                                coverUrl,
+                                fit: BoxFit.cover,
+                                cacheWidth: 360,
+                                cacheHeight: 360,
+                                errorBuilder: (context, error, stackTrace) =>
+                                    const SizedBox.shrink(),
+                              ),
+                            )
+                          : Image.network(
+                              coverUrl,
+                              fit: BoxFit.cover,
+                              cacheWidth: 360,
+                              cacheHeight: 360,
+                              errorBuilder: (context, error, stackTrace) =>
+                                  const SizedBox.shrink(),
+                            ),
                     ),
                   ),
                 ),
@@ -2740,27 +2755,29 @@ class _CommentEntry extends StatelessWidget {
           if (song.source == SongSource.kugou) const SizedBox(width: 4),
 
           // 音乐游戏按钮（在评论按钮右侧）
-          Material(
-            color: Colors.transparent,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(AppRadius.sm),
-              onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute<void>(
-                    builder: (_) => RhythmGamePage(player: player),
+          if (player.playerGameEnabled) ...[
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(AppRadius.sm),
+                onTap: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => RhythmGamePage(player: player),
+                    ),
+                  );
+                },
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                  child: Icon(
+                    Icons.sports_esports_outlined,
+                    size: 22,
+                    color: Colors.white54,
                   ),
-                );
-              },
-              child: const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                child: Icon(
-                  Icons.sports_esports_outlined,
-                  size: 22,
-                  color: Colors.white54,
                 ),
               ),
             ),
-          ),
+          ],
         ],
       ),
       ),

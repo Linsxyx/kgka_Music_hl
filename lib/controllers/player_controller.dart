@@ -62,6 +62,7 @@ class PlayerController extends ChangeNotifier {
       'settings.bluetooth_lyrics_enabled';
   static const _keepScreenOnSettingKey = 'settings.keep_screen_on';
   static const _lyricBlurSettingKey = 'settings.lyric_blur_enabled';
+  static const _playerGameEnabledSettingKey = 'settings.player_game_enabled';
   static const _queueKey = 'playback.queue';
   static const _currentSongKey = 'playback.current_song';
   static const _currentPositionKey = 'playback.current_position';
@@ -247,6 +248,7 @@ class PlayerController extends ChangeNotifier {
   bool addListeningTimeEnabled = true;
   bool keepScreenOnEnabled = false;
   bool lyricBlurEnabled = false;
+  bool playerGameEnabled = true;
   AudioQuality audioQuality = AudioQuality.standard;
 
   bool get isPersonalFmActive => _isPersonalFmActive;
@@ -413,12 +415,28 @@ class PlayerController extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> setPlayerGameEnabled(bool enabled) async {
+    if (playerGameEnabled == enabled) {
+      return;
+    }
+    playerGameEnabled = enabled;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_playerGameEnabledSettingKey, enabled);
+    notifyListeners();
+  }
+
   Future<void> playSong(
     Song song, {
     List<Song>? queue,
     bool preservePersonalFmSession = false,
   }) async {
-    if (!preservePersonalFmSession) {
+    final isPlayingWithinCurrentQueue = _isPersonalFmActive &&
+        (queue == null ||
+            identical(queue, this.queue) ||
+            _isSameQueue(queue, this.queue));
+    final shouldPreserveFm =
+        preservePersonalFmSession || isPlayingWithinCurrentQueue;
+    if (!shouldPreserveFm) {
       _isPersonalFmActive = false;
       _isLoadingPersonalFm = false;
       _personalFmRequestSerial++;
@@ -1803,6 +1821,8 @@ class PlayerController extends ChangeNotifier {
         prefs.getBool(_keepScreenOnSettingKey) ?? keepScreenOnEnabled;
     lyricBlurEnabled =
         prefs.getBool(_lyricBlurSettingKey) ?? lyricBlurEnabled;
+    playerGameEnabled =
+        prefs.getBool(_playerGameEnabledSettingKey) ?? playerGameEnabled;
     audioQuality = AudioQuality.fromApiValue(
       prefs.getString(_audioQualitySettingKey),
     );
@@ -2133,6 +2153,15 @@ class PlayerController extends ChangeNotifier {
       return 'audio:${song.albumAudioId}';
     }
     return song.id.isEmpty ? '' : 'id:${song.id}';
+  }
+
+  bool _isSameQueue(List<Song> a, List<Song> b) {
+    if (identical(a, b)) return true;
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (_songIdentity(a[i]) != _songIdentity(b[i])) return false;
+    }
+    return true;
   }
 
   List<Song> _personalFmAdditions(List<Song> incoming, Song current) {
