@@ -9,6 +9,8 @@ Future<double?> showPlaybackSpeedSheet({
   return showModalBottomSheet<double>(
     context: context,
     showDragHandle: true,
+    // 矮屏 / 手表上内容可能超出半屏，允许弹层长高并滚动
+    isScrollControlled: true,
     backgroundColor: Theme.of(context).colorScheme.surface,
     builder: (sheetContext) {
       return _PlaybackSpeedSheet(player: player);
@@ -64,12 +66,16 @@ class _PlaybackSpeedSheetState extends State<_PlaybackSpeedSheet> {
     final colorScheme = Theme.of(context).colorScheme;
 
     return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(context).height * .85,
+        ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
             Text(
               '倍速播放',
               style: Theme.of(
@@ -148,6 +154,7 @@ class _PlaybackSpeedSheetState extends State<_PlaybackSpeedSheet> {
               ),
             ),
           ],
+          ),
         ),
       ),
     );

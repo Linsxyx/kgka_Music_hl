@@ -11,6 +11,7 @@ import '../../models/music_models.dart';
 import '../../services/music_api.dart';
 import '../../services/search_history_service.dart';
 import '../widgets/artwork.dart';
+import '../widgets/song_artwork.dart';
 import '../widgets/mini_player.dart';
 import '../widgets/now_playing_badge.dart';
 import '../widgets/song_action_sheets.dart';
@@ -20,6 +21,7 @@ import '../widgets/scroll_to_top_button.dart';
 import '../adaptive_layout.dart';
 import 'artist_detail_page.dart';
 import 'playlist_detail_page.dart';
+import 'song_detail_page.dart';
 import 'dart:math' as math;
 
 class SearchPage extends StatefulWidget {
@@ -1339,8 +1341,8 @@ class _SearchResults extends StatelessWidget {
                       children: [
                         Stack(
                           children: [
-                            Artwork(
-                              url: song.coverUrl,
+                            SongArtwork(
+                              song: song,
                               size: 58,
                               borderRadius: 8,
                             ),
@@ -1443,6 +1445,13 @@ class _SearchResults extends StatelessWidget {
                                     icon: Icons.person_rounded,
                                     title: '查看歌手',
                                     onTap: () => onViewArtist(song),
+                                  ),
+                                  SongSheetAction(
+                                    icon: Icons.info_outline_rounded,
+                                    title: '详细信息',
+                                    subtitle: '专辑、发行日期、时长、音源',
+                                    onTap: () =>
+                                        openSongDetailPage(context, song),
                                   ),
                                   if (player.downloadController != null)
                                     SongSheetAction(

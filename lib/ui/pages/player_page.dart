@@ -5,7 +5,9 @@ import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import '../adaptive_layout.dart';
 import '../design_tokens.dart';
+import '../widgets/song_artwork.dart';
 import '../widgets/status_bar_overlay.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
@@ -16,11 +18,12 @@ import '../../controllers/auth_controller.dart';
 import '../../controllers/player_controller.dart';
 import '../../controllers/theme_controller.dart';
 import '../../models/music_models.dart';
+import '../../services/cover_service.dart';
 import '../../services/lyric_converter.dart';
 import '../widgets/audio_effects_sheet.dart';
 import '../widgets/audio_quality_sheet.dart';
 import '../widgets/blurred_lyric_view.dart';
-import '../widgets/artwork.dart';
+import '../widgets/retryable_network_image.dart';
 import '../widgets/playback_speed_sheet.dart';
 import '../widgets/sleep_timer_sheet.dart';
 import '../widgets/song_action_sheets.dart';
@@ -28,6 +31,7 @@ import '../widgets/toast.dart';
 import '../widgets/marquee_text.dart';
 import '../widgets/clickable_artist_text.dart';
 import 'comment_page.dart';
+import 'song_detail_page.dart';
 import 'desktop_lyrics_settings_page.dart';
 import 'rhythm_game/rhythm_game_page.dart';
 
@@ -134,7 +138,7 @@ class _PlayerPageState extends State<PlayerPage> {
                 final active = widget.player.currentSong?.hash == song.hash;
                 return ListTile(
                   selected: active,
-                  leading: Artwork(url: song.coverUrl, size: 44),
+                  leading: SongArtwork(song: song, size: 44),
                   title: active
                       ? MarqueeText(
                           text: song.title,
@@ -235,6 +239,9 @@ class _PlayerBodyState extends State<_PlayerBody> {
     _syncSystemUi(landscape);
     // 横屏分栏布局是车机专属，普通横屏仍用竖屏的翻页布局。
     final isCarLayout = landscape && ThemeController.instance.carModeEnabled;
+    // 手表等极小屏（shortestSide < 300dp）：一屏放不下全部内容，
+    // 播放页需要切换成"纵向可滚动 + 压缩尺寸"的布局。
+    final isWatch = AdaptiveLayout.isWatchSize(size);
 
     return StatusBarOverlay(
       brightness: Brightness.dark,
@@ -258,6 +265,7 @@ class _PlayerBodyState extends State<_PlayerBody> {
                       song: widget.song,
                       onClose: widget.onClose,
                       onArtistTap: _openArtist,
+                      compact: isWatch,
                     ),
                   Expanded(
                     child: isCarLayout
@@ -287,6 +295,7 @@ class _PlayerBodyState extends State<_PlayerBody> {
                                   song: widget.song,
                                   onQueue: widget.onQueue,
                                   isPageVisible: _page == 0 || _pageScrolling,
+                                  isWatch: isWatch,
                                 ),
                                 _LyricPlayerPage(
                                   key: const PageStorageKey(
@@ -295,12 +304,13 @@ class _PlayerBodyState extends State<_PlayerBody> {
                                   player: widget.player,
                                   song: widget.song,
                                   isPageVisible: _lyricPageVisible,
+                                  isWatch: isWatch,
                                 ),
                               ],
                             ),
                           ),
                   ),
-                  if (!isCarLayout) _PageDots(page: _page),
+                  if (!isCarLayout) _PageDots(page: _page, compact: isWatch),
                 ],
               ),
             ),
@@ -423,6 +433,9 @@ class _ArtworkBackgroundState extends State<_ArtworkBackground>
     with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late final AnimationController _rotationController;
 
+  /// 背景封面：自带封面按 360px 取图；缺封面时由 CoverService 补取后刷新。
+  String? _coverUrl;
+
   @override
   void initState() {
     super.initState();
@@ -434,11 +447,28 @@ class _ArtworkBackgroundState extends State<_ArtworkBackground>
     if (!widget.isPaused) {
       _rotationController.repeat();
     }
+    _coverUrl = widget.song.coverUrl;
+    unawaited(_resolveCover());
+  }
+
+  Future<void> _resolveCover() async {
+    if (_coverUrl != null && _coverUrl!.isNotEmpty) return;
+    final song = widget.song;
+    final url = await CoverService.instance.resolve(song);
+    if (!mounted || url == null || url.isEmpty) return;
+    if (widget.song.hash != song.hash || widget.song.id != song.id) return;
+    setState(() => _coverUrl = url);
   }
 
   @override
   void didUpdateWidget(covariant _ArtworkBackground oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.song.hash != widget.song.hash ||
+        oldWidget.song.id != widget.song.id ||
+        oldWidget.song.coverUrl != widget.song.coverUrl) {
+      _coverUrl = widget.song.coverUrl;
+      unawaited(_resolveCover());
+    }
     if (oldWidget.isPaused != widget.isPaused) {
       if (widget.isPaused) {
         if (_rotationController.isAnimating) _rotationController.stop();
@@ -469,10 +499,14 @@ class _ArtworkBackgroundState extends State<_ArtworkBackground>
 
   @override
   Widget build(BuildContext context) {
-    final coverUrl = widget.song.coverUrl;
+    final coverUrl = _coverUrl;
     final size = MediaQuery.sizeOf(context);
     final maxDim = math.max(size.width, size.height);
-    final bgDim = maxDim.clamp(300.0, 900.0);
+    // 圆形唱片的直径：大于屏幕对角线，转动时任何角度都盖满，不会露出边界
+    final discDim = math.sqrt(
+          size.width * size.width + size.height * size.height,
+        ) *
+        1.05;
 
     // 旋转动画背景是纯装饰性的，排除语义树防止 Windows AXTree 竞态崩溃，并用 RepaintBoundary 彻底隔离图层
     return RepaintBoundary(
@@ -483,34 +517,41 @@ class _ArtworkBackgroundState extends State<_ArtworkBackground>
             // 始终显示渐变兜底背景，避免封面加载期间出现纯黑背景
             const _FallbackBackground(),
             if (coverUrl != null)
-              Center(
-                child: SizedBox(
-                  width: bgDim,
-                  height: bgDim,
-                  child: RotationTransition(
-                    turns: _rotationController,
-                    child: RepaintBoundary(
-                      child: ThemeController.instance.liquidGlassEnabled
-                          ? ImageFiltered(
-                              imageFilter:
-                                  ImageFilter.blur(sigmaX: 28, sigmaY: 28),
-                              child: Image.network(
-                                coverUrl,
-                                fit: BoxFit.cover,
-                                cacheWidth: 360,
-                                cacheHeight: 360,
-                                errorBuilder: (context, error, stackTrace) =>
-                                    const SizedBox.shrink(),
-                              ),
-                            )
-                          : Image.network(
-                              coverUrl,
-                              fit: BoxFit.cover,
-                              cacheWidth: 360,
-                              cacheHeight: 360,
-                              errorBuilder: (context, error, stackTrace) =>
-                                  const SizedBox.shrink(),
-                            ),
+              // 做成唱片：封面裁成圆形后整体旋转。圆在任何角度下形状都不变，
+              // 不会像方形那样转出边角和黑边。
+              // 用 OverflowBox 给出宽松约束：否则 SizedBox.square 会被父级
+              // 有限约束压扁，ClipOval 裁出来的就是椭圆（手表上尤其明显）。
+              ClipRect(
+                child: RepaintBoundary(
+                  child: OverflowBox(
+                    minWidth: 0,
+                    minHeight: 0,
+                    maxWidth: double.infinity,
+                    maxHeight: double.infinity,
+                    child: RotationTransition(
+                      turns: _rotationController,
+                      child: SizedBox.square(
+                        dimension: discDim,
+                        child: ClipOval(
+                          child: ThemeController.instance.liquidGlassEnabled
+                              ? ImageFiltered(
+                                  imageFilter: ImageFilter.blur(
+                                    sigmaX: 18,
+                                    sigmaY: 18,
+                                  ),
+                                  child: RetryableNetworkImage(
+                                    url: coverUrl,
+                                    cacheWidth: 720,
+                                    cacheHeight: 720,
+                                  ),
+                                )
+                              : RetryableNetworkImage(
+                                  url: coverUrl,
+                                  cacheWidth: 720,
+                                  cacheHeight: 720,
+                                ),
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -963,8 +1004,8 @@ class _LandscapeArtworkShowcaseState extends State<_LandscapeArtworkShowcase>
                           ),
                         ),
                       ClipOval(
-                        child: Artwork(
-                          url: widget.song.coverUrl,
+                        child: SongArtwork(
+                          song: widget.song,
                           size: coverSize,
                           borderRadius: coverSize,
                         ),
@@ -1252,6 +1293,7 @@ class _TopBar extends StatelessWidget {
     required this.song,
     required this.onClose,
     required this.onArtistTap,
+    this.compact = false,
   });
 
   final PlayerController player;
@@ -1260,23 +1302,43 @@ class _TopBar extends StatelessWidget {
   final VoidCallback onClose;
   final ValueChanged<Song> onArtistTap;
 
+  /// 手表等极小屏：压缩内边距与按钮尺寸，避免横向溢出。
+  final bool compact;
+
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: auth,
       builder: (context, _) {
         final liked = auth.isLiked(song);
+        final buttonSize = compact ? 32.0 : null;
         return Padding(
-          padding: const EdgeInsets.fromLTRB(8, 8, 16, 6),
+          padding: compact
+              ? const EdgeInsets.fromLTRB(2, 2, 6, 2)
+              : const EdgeInsets.fromLTRB(8, 8, 16, 6),
           child: Row(
             children: [
-              IconButton(
-                tooltip: '返回',
-                color: Colors.white,
-                onPressed: onClose,
-                icon: const Icon(Icons.keyboard_arrow_down_rounded),
-              ),
-              const SizedBox(width: 4),
+              if (compact)
+                GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: onClose,
+                  child: const SizedBox.square(
+                    dimension: 30,
+                    child: Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      color: Colors.white,
+                      size: 22,
+                    ),
+                  ),
+                )
+              else
+                IconButton(
+                  tooltip: '返回',
+                  color: Colors.white,
+                  onPressed: onClose,
+                  icon: const Icon(Icons.keyboard_arrow_down_rounded),
+                ),
+              SizedBox(width: compact ? 2 : 4),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1287,6 +1349,7 @@ class _TopBar extends StatelessWidget {
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         color: Colors.white,
                         fontWeight: FontWeight.w800,
+                        fontSize: compact ? 13 : null,
                       ),
                     ),
                     ClickableArtistText(
@@ -1299,6 +1362,7 @@ class _TopBar extends StatelessWidget {
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: Colors.white.withValues(alpha: .82),
                         fontWeight: FontWeight.w600,
+                        fontSize: compact ? 11 : null,
                       ),
                     ),
                   ],
@@ -1306,6 +1370,7 @@ class _TopBar extends StatelessWidget {
               ),
               _GlassIconButton(
                 tooltip: liked ? '取消喜欢' : '喜欢',
+                size: buttonSize,
                 onPressed: song.source == SongSource.kugou
                     ? () => auth.toggleLike(song)
                     : null,
@@ -1313,9 +1378,10 @@ class _TopBar extends StatelessWidget {
                     ? Icons.favorite_rounded
                     : Icons.favorite_border_rounded,
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: compact ? 4 : 8),
               _GlassIconButton(
                 tooltip: '更多',
+                size: buttonSize,
                 onPressed: () => _showMoreSheet(context),
                 icon: Icons.more_horiz_rounded,
               ),
@@ -1357,6 +1423,14 @@ class _TopBar extends StatelessWidget {
           title: '高潮',
           isGrid: true,
           onTap: () async {
+            if (!player.isClimaxSupported) {
+              Toast.error(
+                player.currentSong?.source == SongSource.netease
+                    ? '网易云歌曲暂不支持高潮片段'
+                    : '这首歌暂不支持高潮片段',
+              );
+              return;
+            }
             final ok = await player.playClimaxPreview();
             if (!ok) Toast.error('暂无高潮片段');
           },
@@ -1403,6 +1477,19 @@ class _TopBar extends StatelessWidget {
           ),
         ),
         // List actions
+        SongSheetAction(
+          icon: Icons.info_outline_rounded,
+          title: '详细信息',
+          subtitle: '专辑、发行年份、时长、音源',
+          onTap: () => openSongDetailPage(context, song),
+        ),
+        if (supportsComments(song))
+          SongSheetAction(
+            icon: Icons.comment_outlined,
+            title: '查看评论',
+            subtitle: '热门 / 最新、楼层回复',
+            onTap: () => openCommentPage(context, song),
+          ),
         if (song.source == SongSource.kugou)
           SongSheetAction(
             icon: Icons.playlist_add_rounded,
@@ -1429,12 +1516,16 @@ class _PosterPlayerPage extends StatefulWidget {
     required this.song,
     required this.onQueue,
     this.isPageVisible = true,
+    this.isWatch = false,
   });
 
   final PlayerController player;
   final Song song;
   final VoidCallback onQueue;
   final bool isPageVisible;
+
+  /// 手表等极小屏：整页改为纵向滚动，控件尺寸同时压缩。
+  final bool isWatch;
 
   @override
   State<_PosterPlayerPage> createState() => _PosterPlayerPageState();
@@ -1450,6 +1541,10 @@ class _PosterPlayerPageState extends State<_PosterPlayerPage>
     super.build(context);
     return LayoutBuilder(
       builder: (context, constraints) {
+        if (widget.isWatch) {
+          return _buildWatchScrollable(constraints);
+        }
+
         final compact = constraints.maxHeight < 620;
         // 极矮横屏（某些分辨率）下：唱片区弹性缩放，控制按钮永不被挤出屏幕
         final tiny = constraints.maxHeight < 460;
@@ -1469,8 +1564,8 @@ class _PosterPlayerPageState extends State<_PosterPlayerPage>
                         dimension: artworkMaxWidth,
                         child: Hero(
                           tag: 'player_cover',
-                          child: Artwork(
-                            url: widget.song.coverUrl,
+                          child: SongArtwork(
+                            song: widget.song,
                             size: double.infinity,
                             borderRadius: 8,
                           ),
@@ -1479,6 +1574,8 @@ class _PosterPlayerPageState extends State<_PosterPlayerPage>
                     ),
                   ),
                 ),
+                // 矮屏没有歌词预览区，评论入口同样要保留，否则会找不到。
+                _CommentEntry(player: widget.player, song: widget.song),
               ] else ...[
                 // 常规竖屏/横屏：保持原有固定尺寸布局
                 const Spacer(),
@@ -1488,8 +1585,8 @@ class _PosterPlayerPageState extends State<_PosterPlayerPage>
                     aspectRatio: 1,
                     child: Hero(
                       tag: 'player_cover',
-                      child: Artwork(
-                        url: widget.song.coverUrl,
+                      child: SongArtwork(
+                        song: widget.song,
                         size: double.infinity,
                         borderRadius: 8,
                       ),
@@ -1518,6 +1615,58 @@ class _PosterPlayerPageState extends State<_PosterPlayerPage>
       },
     );
   }
+
+  /// 手表等极小屏布局：内容一屏放不下，改为纵向滚动。
+  ///
+  /// 封面按屏宽弹性缩放，歌词预览 / 进度条 / 控制按钮依次排布；
+  /// 使用 [AlwaysScrollableScrollPhysics] 保证即使内容刚好铺满也能拖动，
+  /// 不会出现"整页滑不动、底部控件看不到"的情况。
+  Widget _buildWatchScrollable(BoxConstraints constraints) {
+    final artworkSize = (constraints.maxWidth * .58).clamp(64.0, 132.0);
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(
+        parent: ClampingScrollPhysics(),
+      ),
+      padding: const EdgeInsets.fromLTRB(6, 2, 6, 8),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox.square(
+            dimension: artworkSize.toDouble(),
+            child: Hero(
+              tag: 'player_cover',
+              child: SongArtwork(
+                song: widget.song,
+                size: double.infinity,
+                borderRadius: 6,
+              ),
+            ),
+          ),
+          const SizedBox(height: 4),
+          _PosterLyricPreview(
+            player: widget.player,
+            isPageVisible: widget.isPageVisible,
+            compact: true,
+          ),
+          const SizedBox(height: 2),
+          _CommentEntry(player: widget.player, song: widget.song),
+          _Progress(player: widget.player, bright: true, compact: true),
+          const SizedBox(height: 2),
+          // 控件行最宽约 220dp，小屏上等比缩小到可见区域内，避免横向溢出。
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: _Controls(
+              player: widget.player,
+              bright: true,
+              compactOverride: true,
+              denseOverride: true,
+              onQueue: widget.onQueue,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 int _activeLyricIndexFor(List<LyricLine> lyrics, Duration position) {
@@ -1537,10 +1686,14 @@ class _PosterLyricPreview extends StatefulWidget {
   const _PosterLyricPreview({
     required this.player,
     this.isPageVisible = true,
+    this.compact = false,
   });
 
   final PlayerController player;
   final bool isPageVisible;
+
+  /// 手表等极小屏：缩小行高与字号，减少占用的竖向空间。
+  final bool compact;
 
   @override
   State<_PosterLyricPreview> createState() => _PosterLyricPreviewState();
@@ -1614,9 +1767,10 @@ class _PosterLyricPreviewState extends State<_PosterLyricPreview> {
   @override
   Widget build(BuildContext context) {
     final lyrics = widget.player.lyrics;
+    final compact = widget.compact;
     if (lyrics.isEmpty) {
       return SizedBox(
-        height: 104,
+        height: compact ? 56 : 104,
         child: Center(
           child: Text(
             widget.player.isPreparing ? '歌词加载中...' : '暂无歌词',
@@ -1624,6 +1778,7 @@ class _PosterLyricPreviewState extends State<_PosterLyricPreview> {
             style: Theme.of(context).textTheme.titleLarge?.copyWith(
               color: Colors.white.withValues(alpha: .78),
               fontWeight: FontWeight.w800,
+              fontSize: compact ? 15 : null,
             ),
           ),
         ),
@@ -1637,12 +1792,13 @@ class _PosterLyricPreviewState extends State<_PosterLyricPreview> {
     final next = index + 1 < lyrics.length ? lyrics[index + 1] : null;
     final currentStyle = Theme.of(context).textTheme.titleLarge!.copyWith(
       color: Colors.white,
-      fontSize: 22,
+      fontSize: compact ? 15 : 22,
       height: 1.22,
       fontWeight: FontWeight.w900,
     );
     final nextStyle = Theme.of(context).textTheme.titleMedium!.copyWith(
       color: Colors.white.withValues(alpha: .46),
+      fontSize: compact ? 12 : null,
       height: 1.18,
       fontWeight: FontWeight.w700,
     );
@@ -1650,7 +1806,7 @@ class _PosterLyricPreviewState extends State<_PosterLyricPreview> {
     // 歌词预览每帧更新位置，用 ExcludeSemantics 防止 Windows AXTree 竞态崩溃
     return ExcludeSemantics(
       child: SizedBox(
-        height: 96,
+        height: compact ? 58 : 96,
         child: AnimatedSwitcher(
           duration: const Duration(milliseconds: 260),
           switchInCurve: Curves.easeOutCubic,
@@ -1660,7 +1816,7 @@ class _PosterLyricPreviewState extends State<_PosterLyricPreview> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               SizedBox(
-                height: 36,
+                height: compact ? 22 : 36,
                 child: _MarqueeSingleLine(
                   textKey: current.time.inMilliseconds,
                   child: _LyricText(
@@ -1673,9 +1829,9 @@ class _PosterLyricPreviewState extends State<_PosterLyricPreview> {
                   ),
                 ),
               ),
-              const SizedBox(height: 8),
+              SizedBox(height: compact ? 3 : 8),
               SizedBox(
-                height: 25,
+                height: compact ? 16 : 25,
                 child: _MarqueeSingleLine(
                   textKey: current.translation != null && current.translation!.isNotEmpty
                       ? current.time.inMilliseconds
@@ -1808,11 +1964,15 @@ class _LyricPlayerPage extends StatefulWidget {
     required this.player,
     required this.song,
     required this.isPageVisible,
+    this.isWatch = false,
   });
 
   final PlayerController player;
   final Song song;
   final bool isPageVisible;
+
+  /// 手表等极小屏：压缩内边距、字号与悬浮按钮尺寸。
+  final bool isWatch;
 
   @override
   State<_LyricPlayerPage> createState() => _LyricPlayerPageState();
@@ -1936,7 +2096,9 @@ class _LyricPlayerPageState extends State<_LyricPlayerPage>
     );
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 18),
+      padding: widget.isWatch
+          ? const EdgeInsets.fromLTRB(6, 2, 6, 6)
+          : const EdgeInsets.fromLTRB(20, 8, 20, 18),
       child: Stack(
         children: [
           _LyricViewport(
@@ -1946,34 +2108,48 @@ class _LyricPlayerPageState extends State<_LyricPlayerPage>
             displayMode: displayMode,
             isPageVisible: widget.isPageVisible,
             lyricScale: _lyricScale,
+            compact: widget.isWatch,
           ),
           // 字体大小调节按钮（左侧底部，左对齐）
           Positioned(
             left: 0,
-            bottom: 16,
+            bottom: widget.isWatch ? 2 : 16,
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 _GlassIconButton(
                   tooltip: '缩小歌词',
+                  size: widget.isWatch ? 30 : null,
                   onPressed: () => _setLyricScale(_lyricScale - 0.1),
                   icon: Icons.text_decrease_rounded,
                 ),
-                const SizedBox(width: 8),
+                SizedBox(width: widget.isWatch ? 4 : 8),
                 _GlassIconButton(
                   tooltip: '放大歌词',
+                  size: widget.isWatch ? 30 : null,
                   onPressed: () => _setLyricScale(_lyricScale + 0.1),
                   icon: Icons.text_increase_rounded,
                 ),
+                // 歌词页也放一个评论入口，避免必须滑回封面页才能看评论。
+                if (supportsComments(widget.song)) ...[
+                  SizedBox(width: widget.isWatch ? 4 : 8),
+                  _GlassIconButton(
+                    tooltip: '查看评论',
+                    size: widget.isWatch ? 30 : null,
+                    onPressed: () => openCommentPage(context, widget.song),
+                    icon: Icons.comment_outlined,
+                  ),
+                ],
               ],
             ),
           ),
           if (canToggleLyricDisplayMode)
             Positioned(
               right: 0,
-              bottom: 16,
+              bottom: widget.isWatch ? 2 : 16,
               child: _GlassIconButton(
                 tooltip: '切换歌词模式（当前：${_lyricDisplayModeLabel(displayMode)}）',
+                size: widget.isWatch ? 30 : null,
                 onPressed: _toggleLyricDisplayMode,
                 icon: switch (displayMode) {
                   _LyricDisplayMode.lyricsWithTranslation =>
@@ -1998,6 +2174,7 @@ class _LyricViewport extends StatefulWidget {
     required this.displayMode,
     required this.isPageVisible,
     required this.lyricScale,
+    this.compact = false,
   });
 
   final PlayerController player;
@@ -2006,6 +2183,9 @@ class _LyricViewport extends StatefulWidget {
   final _LyricDisplayMode displayMode;
   final bool isPageVisible;
   final double lyricScale;
+
+  /// 手表等极小屏：整体缩小歌词字号与行距。
+  final bool compact;
 
   @override
   State<_LyricViewport> createState() => _LyricViewportState();
@@ -2109,15 +2289,18 @@ class _LyricViewportState extends State<_LyricViewport> {
           style: Theme.of(context).textTheme.headlineSmall?.copyWith(
             color: Colors.white,
             fontWeight: FontWeight.w800,
+            fontSize: widget.compact ? 15 : null,
           ),
         ),
       );
     }
 
     final scale = widget.lyricScale;
-    final mainFontSize = 38.0 * scale;
-    final inactiveFontSize = 30.0 * scale;
-    final subtitleFontSize = 20.0 * scale;
+    // 手表等极小屏上再乘一个基础缩小系数，避免一行歌词占满整屏。
+    final baseScale = widget.compact ? .58 : 1.0;
+    final mainFontSize = 38.0 * scale * baseScale;
+    final inactiveFontSize = 30.0 * scale * baseScale;
+    final subtitleFontSize = 20.0 * scale * baseScale;
 
     final lyricStyle = LyricStyles.default1.copyWith(
       textStyle: Theme.of(context).textTheme.headlineSmall!.copyWith(
@@ -2141,11 +2324,11 @@ class _LyricViewportState extends State<_LyricViewport> {
         fontWeight: FontWeight.w500,
       ),
       translationActiveColor: Colors.white.withValues(alpha: .95),
-      lineGap: 16 * scale,
-      translationLineGap: 6 * scale,
+      lineGap: 16 * scale * baseScale,
+      translationLineGap: 6 * scale * baseScale,
       contentPadding: EdgeInsets.symmetric(
-        horizontal: 20,
-        vertical: 40 * scale,
+        horizontal: widget.compact ? 8 : 20,
+        vertical: 40 * scale * baseScale,
       ),
       anchorPosition: _lyricAnchorFraction,
       activeAnchorPosition: _lyricAnchorFraction,
@@ -2403,6 +2586,7 @@ class _Progress extends StatelessWidget {
             final dotSize = compact ? 7.0 : 8.0;
             return Stack(
               alignment: Alignment.centerLeft,
+              clipBehavior: Clip.none,
               children: [
                 SliderTheme(
                   data: SliderTheme.of(context).copyWith(
@@ -2432,25 +2616,31 @@ class _Progress extends StatelessWidget {
                   ),
                 ),
                 if (climaxFraction != null)
-                  Positioned(
-                    left: thumbRadius +
-                        climaxFraction * (width - 2 * thumbRadius) -
-                        dotSize / 2,
-                    top: 24 - dotSize / 2,
-                    child: IgnorePointer(
-                      child: Container(
-                        width: dotSize,
-                        height: dotSize,
-                        decoration: BoxDecoration(
-                          color: bright
-                              ? Colors.white
-                              : Theme.of(context).colorScheme.primary,
-                          shape: BoxShape.circle,
-                          border: Border.all(
+                  // 用 Stack 的 Alignment 定位垂直方向，而不是写死 top 值：
+                  // Slider 的实际高度随主题 / 紧凑档变化，硬编码会错位（手表上会跑到轨道下方）。
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Padding(
+                      padding: EdgeInsets.only(
+                        left: thumbRadius +
+                            climaxFraction * (width - 2 * thumbRadius) -
+                            dotSize / 2,
+                      ),
+                      child: IgnorePointer(
+                        child: Container(
+                          width: dotSize,
+                          height: dotSize,
+                          decoration: BoxDecoration(
                             color: bright
-                                ? Colors.black.withValues(alpha: .4)
-                                : Colors.white,
-                            width: 1.2,
+                                ? Colors.white
+                                : Theme.of(context).colorScheme.primary,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: bright
+                                  ? Colors.black.withValues(alpha: .4)
+                                  : Colors.white,
+                              width: 1.2,
+                            ),
                           ),
                         ),
                       ),
@@ -2684,14 +2874,47 @@ class _GlassIconButton extends StatelessWidget {
     required this.tooltip,
     required this.onPressed,
     required this.icon,
+    this.size,
   });
 
   final String tooltip;
   final VoidCallback? onPressed;
   final IconData icon;
 
+  /// 传入后按钮按此边长渲染（手表等极小屏使用）；
+  /// 为空时保持 IconButton 的默认尺寸与点击热区。
+  final double? size;
+
   @override
   Widget build(BuildContext context) {
+    final buttonSize = size;
+    if (buttonSize != null) {
+      // IconButton 会补足 48dp 的最小点击热区，极小屏上会撑破布局，
+      // 这里改用固定边长的 InkWell 自行控制尺寸。
+      return Tooltip(
+        message: tooltip,
+        child: Material(
+          color: Colors.white.withValues(alpha: .14),
+          shape: const CircleBorder(),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onPressed,
+            customBorder: const CircleBorder(),
+            child: SizedBox.square(
+              dimension: buttonSize,
+              child: Icon(
+                icon,
+                size: buttonSize * .62,
+                color: Colors.white.withValues(
+                  alpha: onPressed == null ? .4 : 1,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     return Tooltip(
       message: tooltip,
       child: Material(
@@ -2726,33 +2949,27 @@ class _CommentEntry extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             // 评论按钮（在左侧）
-            if (song.source == SongSource.kugou)
-            Material(
-              color: Colors.transparent,
-              child: InkWell(
-                borderRadius: BorderRadius.circular(AppRadius.sm),
-                onTap: () {
-                  final mixsongid = song.albumAudioId ?? song.id;
-                  if (mixsongid.isEmpty) return;
-                  Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) =>
-                          CommentPage(api: player.api, mixsongid: mixsongid),
+            if (supportsComments(song))
+            Tooltip(
+              message: '查看评论',
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(AppRadius.sm),
+                  onTap: () => openCommentPage(context, song),
+                  child: const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                    child: Icon(
+                      Icons.comment_outlined,
+                      size: 22,
+                      color: Colors.white70,
                     ),
-                  );
-                },
-                child: const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                  child: Icon(
-                    Icons.comment_outlined,
-                    size: 20,
-                    color: Colors.white54,
                   ),
                 ),
               ),
             ),
 
-          if (song.source == SongSource.kugou) const SizedBox(width: 4),
+          if (supportsComments(song)) const SizedBox(width: 4),
 
           // 音乐游戏按钮（在评论按钮右侧）
           if (player.playerGameEnabled) ...[
@@ -2786,23 +3003,27 @@ class _CommentEntry extends StatelessWidget {
 }
 
 class _PageDots extends StatelessWidget {
-  const _PageDots({required this.page});
+  const _PageDots({required this.page, this.compact = false});
 
   final int page;
 
+  /// 手表等极小屏：缩小指示点与下边距，给内容多留几像素。
+  final bool compact;
+
   @override
   Widget build(BuildContext context) {
+    final dotHeight = compact ? 5.0 : 7.0;
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
+      padding: EdgeInsets.only(bottom: compact ? 4 : 10),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: List.generate(2, (index) {
           final active = index == page;
           return AnimatedContainer(
             duration: const Duration(milliseconds: 180),
-            width: active ? 18 : 7,
-            height: 7,
-            margin: const EdgeInsets.symmetric(horizontal: 4),
+            width: active ? (compact ? 12.0 : 18.0) : dotHeight,
+            height: dotHeight,
+            margin: EdgeInsets.symmetric(horizontal: compact ? 3 : 4),
             decoration: BoxDecoration(
               color: Colors.white.withValues(alpha: active ? .86 : .32),
               borderRadius: BorderRadius.circular(99),

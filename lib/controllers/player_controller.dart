@@ -14,6 +14,7 @@ import '../core/shuffle_cycle.dart';
 import '../models/music_models.dart';
 import '../services/audio_effects_service.dart';
 import '../services/cache_service.dart';
+import '../services/cover_service.dart';
 import '../services/desktop_lyrics_service.dart';
 import '../services/music_api.dart';
 import '../services/local_lyrics_service.dart';
@@ -22,6 +23,7 @@ import '../services/bluetooth_lyrics_service.dart';
 import '../services/playback_history_service.dart';
 import '../services/playback_stats_service.dart';
 import '../services/super_lyric_service.dart';
+import '../services/netease_image_provider.dart';
 import 'download_controller.dart';
 import 'local_music_controller.dart';
 
@@ -576,11 +578,32 @@ class PlayerController extends ChangeNotifier {
   }
 
   /// 预缓存歌曲封面到 Flutter ImageCache，打开播放页时可立即显示。
+  ///
+  /// 地址按显示尺寸规格化：网易云封面原图 1~2MB，取 `?param=480y480` 只有
+  /// 300KB 左右（见 [CoverService.sized]）。歌曲完全没有封面时再按来源补取。
   void _precacheCover(Song song) {
-    final coverUrl = song.coverUrl;
-    if (coverUrl == null || coverUrl.isEmpty) return;
-    if (coverUrl.startsWith('content://')) return; // 本地封面走原生加载，不预缓存
-    final provider = NetworkImage(coverUrl);
+    final coverUrl = CoverService.sized(song.coverUrl, 240);
+    if (coverUrl != null && coverUrl.isNotEmpty) {
+      _resolveCoverProvider(coverUrl);
+      return;
+    }
+    unawaited(
+      CoverService.instance.resolve(song).then((url) {
+        if (url == null || url.isEmpty) return;
+        _resolveCoverProvider(CoverService.sized(url, 240) ?? url);
+      }),
+    );
+  }
+
+  /// 按来源选择合适的 ImageProvider 预热。
+  ///
+  /// 网易云必须走 [NeteaseImageProvider]：它在 HttpClient 层用 `set` 覆盖
+  /// User-Agent；用 `NetworkImage(headers:)` 会变成两个 User-Agent 而被 403。
+  void _resolveCoverProvider(String url) {
+    if (url.startsWith('content://')) return; // 本地封面走原生加载，不预缓存
+    final ImageProvider provider = CoverService.isNeteaseImage(url)
+        ? NeteaseImageProvider(url)
+        : NetworkImage(url);
     provider.resolve(ImageConfiguration.empty);
   }
 
@@ -1014,17 +1037,32 @@ class PlayerController extends ChangeNotifier {
     }
   }
 
+  /// 当前歌曲是否支持高潮片段。
+  ///
+  /// 只有酷狗提供 `/song/climax`；网易云的 hash 是 `ne_<id>`，接口只返回
+  /// 空对象 `{}`，本地歌曲同理，所以直接判定不支持，避免点了才报错。
+  bool get isClimaxSupported {
+    final song = currentSong;
+    if (song == null) return false;
+    if (song.source != SongSource.kugou) return false;
+    return song.hash.isNotEmpty && !song.hash.startsWith('ne_');
+  }
+
   /// 试听当前歌曲的高潮片段：定位到高潮开始并播放，到高潮结束自动暂停。
   /// 返回是否成功（无高潮片段或失败时返回 false）。
   Future<bool> playClimaxPreview() async {
     final song = currentSong;
-    if (song == null) return false;
+    if (song == null || !isClimaxSupported) return false;
     try {
-      final climax = await _api.songClimax(song.hash);
-      if (climax == null) return false;
-      this.climax = climax;
-      _climaxEndTime = climax.endTime;
-      await seek(climax.startTime);
+      // 切歌时已经预取过就直接用，避免每次点击都多打一次接口
+      final cached = climax;
+      final data = cached != null && cached.isValid
+          ? cached
+          : await _api.songClimax(song.hash);
+      if (data == null) return false;
+      climax = data;
+      _climaxEndTime = data.endTime;
+      await seek(data.startTime);
       await play();
       return true;
     } catch (_) {
@@ -1042,6 +1080,16 @@ class PlayerController extends ChangeNotifier {
 
   /// 异步获取当前歌曲高潮时间，用于进度条标记（失败静默）。
   Future<void> _loadClimax(Song song) async {
+    // 网易云 / 本地歌曲没有高潮数据，不发无效请求
+    if (song.source != SongSource.kugou ||
+        song.hash.isEmpty ||
+        song.hash.startsWith('ne_')) {
+      if (currentSong?.hash == song.hash && climax != null) {
+        climax = null;
+        notifyListeners();
+      }
+      return;
+    }
     try {
       final result = await _api.songClimax(song.hash);
       if (currentSong?.hash != song.hash) return;

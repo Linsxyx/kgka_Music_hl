@@ -12,6 +12,8 @@ Future<void> showSleepTimerSheet({
   return showModalBottomSheet<void>(
     context: context,
     showDragHandle: true,
+    // 矮屏 / 手表上内容可能超出半屏，允许弹层长高并滚动
+    isScrollControlled: true,
     backgroundColor: Theme.of(context).colorScheme.surface,
     builder: (context) => _SleepTimerSheet(player: player),
   );
@@ -66,12 +68,16 @@ class _SleepTimerSheetState extends State<_SleepTimerSheet> {
     final isActive = player.isSleepTimerActive || player.isSleepFinishCurrentSong;
 
     return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(context).height * .85,
+        ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
             Row(
               children: [
                 Icon(Icons.bedtime_rounded, color: colorScheme.primary),
@@ -150,6 +156,7 @@ class _SleepTimerSheetState extends State<_SleepTimerSheet> {
               ],
             ),
           ],
+          ),
         ),
       ),
     );

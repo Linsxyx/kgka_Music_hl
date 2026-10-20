@@ -263,7 +263,8 @@ class MusicApi {
   Future<List<TopAlbumItem>> topAlbums({int page = 1, int pageSize = 30}) async {
     final raw = await _client.get('/top/album', {'page': page, 'pagesize': pageSize});
     final json = asMap(raw);
-    final data = asMap(json['data']);
+    // ApiClient 可能已经把 data 解包了，此时 raw 本身就是含 chn 的对象
+    final data = asMap(json['data'] ?? json);
     final items = asList(data['chn'] ?? json['chn']);
     return items
         .whereType<Map<String, dynamic>>()
@@ -636,12 +637,20 @@ class MusicApi {
   }
 
   /// 获取歌曲高潮片段时间信息，无高潮时返回 null。
+  ///
+  /// 注意：`ApiClient` 在 `_processResponse` 里已经调用过 `unwrapData`，
+  /// 把响应里的 `data` 字段解包出来了，所以这里拿到的 raw 直接就是
+  /// 片段数组 `[{...}]`，不能再按 `{'data': [...]}` 去取一次，
+  /// 否则永远是空（之前所有歌都提示“暂无高潮片段”就是这个原因）。
   Future<SongClimax?> songClimax(String hash) async {
     final raw = await _client.get('/song/climax', {'hash': hash});
-    final json = asMap(raw);
-    for (final item in asList(json['data'])) {
-      if (item is Map<String, dynamic>) {
-        final climax = SongClimax.fromJson(item);
+    // 兼容两种形态：已解包的数组，或仍带 data 字段的对象
+    final list = raw is List
+        ? raw
+        : asList(asMap(raw)['data']);
+    for (final item in list) {
+      if (item is Map) {
+        final climax = SongClimax.fromJson(asMap(item));
         if (climax.isValid) return climax;
       }
     }

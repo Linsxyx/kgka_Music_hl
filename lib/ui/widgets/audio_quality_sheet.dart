@@ -12,67 +12,75 @@ Future<AudioQuality?> showAudioQualitySheet({
   return showModalBottomSheet<AudioQuality>(
     context: context,
     showDragHandle: true,
+    // 矮屏 / 手表上内容可能超出半屏，允许弹层长高到 85% 屏高
+    isScrollControlled: true,
     backgroundColor: Theme.of(context).colorScheme.surface,
     builder: (sheetContext) {
       final colorScheme = Theme.of(sheetContext).colorScheme;
       return SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: Theme.of(
-                  sheetContext,
-                ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
-              ),
-              if (subtitle != null) ...[
-                const SizedBox(height: 4),
+        child: ConstrainedBox(
+          // 限制最大高度，超出的部分靠滚动查看，不会把选项挤掉
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(sheetContext).height * .85,
+          ),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 18),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
                 Text(
-                  subtitle,
-                  style: Theme.of(sheetContext).textTheme.bodyMedium?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
+                  title,
+                  style: Theme.of(
+                    sheetContext,
+                  ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
+                ),
+                if (subtitle != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: Theme.of(sheetContext).textTheme.bodyMedium?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 12),
+                Material(
+                  color: colorScheme.surfaceContainer,
+                  borderRadius: BorderRadius.circular(AppRadius.lg),
+                  clipBehavior: Clip.antiAlias,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: colorScheme.surfaceContainer,
+                      borderRadius: BorderRadius.circular(AppRadius.lg),
+                    ),
+                    child: Column(
+                      children: [
+                        for (final quality in AudioQuality.values) ...[
+                          ListTile(
+                            onTap: () => Navigator.of(sheetContext).pop(quality),
+                            leading: Icon(_iconForQuality(quality)),
+                            title: Text(quality.label),
+                            subtitle: Text(quality.badge),
+                            trailing: selected == quality
+                                ? Icon(
+                                    Icons.check_rounded,
+                                    color: colorScheme.primary,
+                                  )
+                                : null,
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                            ),
+                          ),
+                          if (quality != AudioQuality.values.last)
+                            const Divider(height: 1, indent: 58),
+                        ],
+                      ],
+                    ),
                   ),
                 ),
               ],
-              const SizedBox(height: 12),
-              Material(
-                color: colorScheme.surfaceContainer,
-                borderRadius: BorderRadius.circular(AppRadius.lg),
-                clipBehavior: Clip.antiAlias,
-                child: DecoratedBox(
-                  decoration: BoxDecoration(
-                    color: colorScheme.surfaceContainer,
-                    borderRadius: BorderRadius.circular(AppRadius.lg),
-                  ),
-                  child: Column(
-                    children: [
-                      for (final quality in AudioQuality.values) ...[
-                        ListTile(
-                          onTap: () => Navigator.of(sheetContext).pop(quality),
-                          leading: Icon(_iconForQuality(quality)),
-                          title: Text(quality.label),
-                          subtitle: Text(quality.badge),
-                          trailing: selected == quality
-                              ? Icon(
-                                  Icons.check_rounded,
-                                  color: colorScheme.primary,
-                                )
-                              : null,
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                          ),
-                        ),
-                        if (quality != AudioQuality.values.last)
-                          const Divider(height: 1, indent: 58),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       );

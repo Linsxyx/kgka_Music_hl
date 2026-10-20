@@ -16,6 +16,7 @@ import '../../models/music_models.dart';
 import '../../services/cache_service.dart';
 import '../../services/music_api.dart';
 import '../widgets/artwork.dart';
+import '../widgets/song_artwork.dart';
 import '../widgets/import_playlist_sheet.dart';
 import '../widgets/mini_player.dart';
 import '../widgets/now_playing_badge.dart';
@@ -1965,7 +1966,7 @@ class _SongRow extends StatelessWidget {
                   dimension: 50,
                   child: Stack(
                     children: [
-                      Artwork(url: song.coverUrl, size: 50, borderRadius: 9),
+                      SongArtwork(song: song, size: 50, borderRadius: 9),
                       Positioned(
                         left: 4,
                         top: 4,
