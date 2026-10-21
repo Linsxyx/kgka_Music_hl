@@ -2,7 +2,8 @@ name: Flutter Analyze & Build Check
 
 # 不本地编译，全部交给 Actions 验证：
 #   1) flutter analyze   —— 最快暴露语法/类型错误，失败就直接停
-#   2) build release APK —— 产出可安装包
+#   2) flutter test      —— 仓库自带的单元/组件测试
+#   3) build release APK —— 产出可安装包
 #
 # 缓存策略（这是提速关键）：
 #   - Flutter SDK：subosito/flutter-action 自带 cache
@@ -12,10 +13,16 @@ name: Flutter Analyze & Build Check
 # 两个 job 合成一个，避免重复 checkout + 装 SDK（每次约省 40s）。
 on:
   push:
+    # 只在主干上打包；其它分支交给 pull_request 触发，避免同一分支跑两遍。
     branches:
-      - '**'
+      - master
   pull_request:
   workflow_dispatch:
+
+# 同一分支有新提交时取消上一次运行，省 Actions 额度。
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -68,6 +75,9 @@ jobs:
 
       - name: Analyze
         run: flutter analyze --no-fatal-infos --no-fatal-warnings
+
+      - name: Test
+        run: flutter test
 
       # release 签名：android/app/build.gradle.kts 从 android/key.properties 读取。
       # 有 secrets 就写 key.properties 用正式证书签名；没有就留空，Gradle 会按

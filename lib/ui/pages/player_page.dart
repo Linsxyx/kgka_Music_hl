@@ -501,7 +501,6 @@ class _ArtworkBackgroundState extends State<_ArtworkBackground>
   Widget build(BuildContext context) {
     final coverUrl = _coverUrl;
     final size = MediaQuery.sizeOf(context);
-    final maxDim = math.max(size.width, size.height);
     // 圆形唱片的直径：大于屏幕对角线，转动时任何角度都盖满，不会露出边界
     final discDim = math.sqrt(
           size.width * size.width + size.height * size.height,

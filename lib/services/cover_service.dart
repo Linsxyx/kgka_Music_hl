@@ -79,8 +79,9 @@ class CoverService {
     final songId = (song.albumAudioId ?? song.id).trim();
     if (songId.isEmpty) return null;
 
-    final cached = _cache[songId];
-    if (cached != null) return cached;
+    // 命中缓存就直接返回，包含"取不到"的负缓存（value 为 null）：
+    // 用 containsKey 而不是 null 判断，否则失败过的歌曲每次都会重新请求。
+    if (_cache.containsKey(songId)) return _cache[songId];
 
     final future = _inflight[songId] ??= _fetchNeteaseCover(
       songId,

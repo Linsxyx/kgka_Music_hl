@@ -246,6 +246,9 @@ class _CommentTabState extends State<_CommentTab> {
   var _isLoading = true;
   String? _errorMessage;
 
+  /// 最近一次失败的那一页，重试时直接回到这一页。
+  int? _failedPage;
+
   @override
   void initState() {
     super.initState();
@@ -283,6 +286,7 @@ class _CommentTabState extends State<_CommentTab> {
         _maxPage = data.maxPage;
         _total = data.total;
         _isLoading = false;
+        _failedPage = null;
       });
       widget.onTotalChanged(_total);
       if (_scrollController.hasClients) {
@@ -294,6 +298,7 @@ class _CommentTabState extends State<_CommentTab> {
         _errorMessage = error is CommentException
             ? error.message
             : error.toString();
+        _failedPage = page;
         _isLoading = false;
       });
     }
@@ -416,6 +421,28 @@ class _CommentTabState extends State<_CommentTab> {
                 height: 16,
                 child: CircularProgressIndicator(strokeWidth: 2),
               ),
+            )
+          else if (_errorMessage != null)
+            // 翻页失败时列表里还有旧内容，不能整页换成错误页，
+            // 这里给一条可重试的提示，否则用户只会觉得“点了没反应”。
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Flexible(
+                  child: Text(
+                    '加载失败：$_errorMessage',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.error,
+                    ),
+                  ),
+                ),
+                TextButton(
+                  onPressed: () => _load(_failedPage ?? _page),
+                  child: const Text('重试'),
+                ),
+              ],
             )
           else
             Text(
@@ -804,6 +831,8 @@ class _RepliesSheetState extends State<_RepliesSheet> {
   }
 
   void _maybeLoadMore() {
+    // 上一页刚失败时不要因为滚动自动重试，交给用户点“重试”。
+    if (_errorMessage != null) return;
     if (!_scrollController.hasClients || _isLoading || !_hasMore) return;
     if (_scrollController.position.extentAfter < 240) {
       _loadMore();
@@ -905,6 +934,18 @@ class _RepliesSheetState extends State<_RepliesSheet> {
       itemCount: _replies.length + (_hasMore ? 1 : 0),
       itemBuilder: (context, index) {
         if (index == _replies.length) {
+          if (_errorMessage != null) {
+            return Padding(
+              padding: const EdgeInsets.all(12),
+              child: Center(
+                child: TextButton.icon(
+                  onPressed: _loadMore,
+                  icon: const Icon(Icons.refresh_rounded, size: 18),
+                  label: const Text('加载失败，点击重试'),
+                ),
+              ),
+            );
+          }
           return const Padding(
             padding: EdgeInsets.all(16),
             child: Center(
