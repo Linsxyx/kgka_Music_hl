@@ -8,6 +8,7 @@ import '../../controllers/player_controller.dart';
 import '../../controllers/theme_controller.dart';
 import '../../models/music_models.dart';
 import 'artwork.dart';
+import 'song_artwork.dart';
 import 'toast.dart';
 
 class SongSheetAction {
@@ -96,7 +97,7 @@ Future<void> showSongActionSheet({
                 // Song info
                 Row(
                   children: [
-                    Artwork(url: song.coverUrl, size: 52, borderRadius: 10),
+                    SongArtwork(song: song, size: 52, borderRadius: 10),
                     const SizedBox(width: 12),
                     Expanded(
                       child: Column(

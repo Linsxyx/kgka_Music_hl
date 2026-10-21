@@ -7,7 +7,7 @@ import '../../controllers/auth_controller.dart';
 import '../../controllers/player_controller.dart';
 import '../../controllers/theme_controller.dart';
 import '../pages/player_page.dart';
-import 'artwork.dart';
+import 'song_artwork.dart';
 
 /// 全局通用的悬浮液态玻璃音乐唱片控制器（Floating Liquid Glass Disc Pod）。
 /// 在所有二级页面底部居中悬浮，与主页底栏唱片无缝位置与空间衔接。
@@ -243,8 +243,8 @@ class _MiniPlayerState extends State<MiniPlayer>
                                       child: Stack(
                                         alignment: Alignment.center,
                                         children: [
-                                          Artwork(
-                                            url: song.coverUrl,
+                                          SongArtwork(
+                                            song: song,
                                             size: 38,
                                             borderRadius: 38,
                                           ),

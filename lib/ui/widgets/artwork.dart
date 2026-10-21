@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'retryable_network_image.dart';
+
 class Artwork extends StatelessWidget {
   const Artwork({
     super.key,
@@ -27,20 +29,18 @@ class Artwork extends StatelessWidget {
                 borderRadius: borderRadius,
                 icon: icon,
               )
-            : Image.network(
-                imageUrl,
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) =>
-                    _Fallback(icon: icon),
-                loadingBuilder: (context, child, progress) {
-                  if (progress == null) {
-                    return child;
-                  }
-                  return _ShimmerBox(
-                    size: size,
-                    borderRadius: borderRadius,
-                  );
-                },
+            : RetryableNetworkImage(
+                url: imageUrl,
+                // 固定尺寸的封面按 2 倍图取；铺满容器的大封面取 1024，
+                // 宽高交给外层 SizedBox 约束，不在这里写死 infinity。
+                width: size.isFinite ? size : null,
+                height: size.isFinite ? size : null,
+                cacheWidth: size.isFinite ? (size * 2).round() : 1024,
+                cacheHeight: size.isFinite ? (size * 2).round() : 1024,
+                placeholderBuilder: (context) => _ShimmerBox(
+                  size: size,
+                  borderRadius: borderRadius,
+                ),
               );
 
     return ClipRRect(

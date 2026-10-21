@@ -1,0 +1,129 @@
+name: Flutter Analyze & Build Check
+
+# 不本地编译，全部交给 Actions 验证：
+#   1) flutter analyze   —— 最快暴露语法/类型错误，失败就直接停
+#   2) build release APK —— 产出可安装包
+#
+# 缓存策略（这是提速关键）：
+#   - Flutter SDK：subosito/flutter-action 自带 cache
+#   - pub 依赖：~/.pub-cache
+#   - Gradle：~/.gradle/caches + ~/.gradle/wrapper（含 AGP、Kotlin、JitPack 依赖）
+#   - 构建产物增量：build/（analyze 与 build 同 job，天然共享）
+# 两个 job 合成一个，避免重复 checkout + 装 SDK（每次约省 40s）。
+on:
+  push:
+    branches:
+      - '**'
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: analyze + release apk
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Disable analytics
+        run: flutter config --no-analytics
+
+      # Pub 缓存：key 绑定 pubspec.lock，依赖不变就一直命中
+      - name: Cache pub packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.pub-cache
+          key: pub-${{ runner.os }}-${{ hashFiles('pubspec.lock') }}
+          restore-keys: |
+            pub-${{ runner.os }}-
+
+      # Gradle 缓存：Android 构建最耗时的部分（AGP / Kotlin / 三方 AAR）
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('android/**/*.gradle*', 'android/gradle/wrapper/gradle-wrapper.properties', 'pubspec.lock') }}
+          restore-keys: |
+            gradle-${{ runner.os }}-
+
+      - name: Pub get
+        run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+
+      # release 签名：android/app/build.gradle.kts 从 android/key.properties 读取。
+      # 有 secrets 就写 key.properties 用正式证书签名；没有就留空，Gradle 会按
+      # build.gradle.kts 里的逻辑回退 debug 签名（仍然是 release 构建）。
+      #   ANDROID_KEYSTORE_PASSWORD / ANDROID_KEY_ALIAS / ANDROID_KEY_PASSWORD
+      #   ANDROID_KEYSTORE_BASE64（可选，不给就用仓库里已跟踪的 buildKey.keystore）
+      - name: Configure release signing
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          if [[ -n "$STORE_PASSWORD" && -n "$KEY_ALIAS" && -n "$KEY_PASSWORD" ]]; then
+            if [[ -n "$KEYSTORE_B64" ]]; then
+              echo "$KEYSTORE_B64" | base64 -d > android/release.keystore
+              STORE_FILE="../release.keystore"
+            else
+              STORE_FILE="../buildKey.keystore"
+            fi
+            cat > android/key.properties <<EOF
+          storeFile=$STORE_FILE
+          storePassword=$STORE_PASSWORD
+          keyAlias=$KEY_ALIAS
+          keyPassword=$KEY_PASSWORD
+          EOF
+            echo "已写入 android/key.properties，release 使用正式证书签名"
+          else
+            echo "::warning::未提供签名 secrets，release APK 将使用 debug 签名"
+          fi
+
+      # 没有正式签名时 Gradle 会回退到 ~/.android/debug.keystore，而 runner 每次都是
+      # 全新环境、debug keystore 每次随机生成 → 每次产出的 APK 签名都不同，覆盖安装会
+      # 报 INSTALL_FAILED_UPDATE_INCOMPATIBLE。这里把 debug keystore 缓存住，
+      # 让多次构建的签名保持一致。
+      - name: Cache stable debug keystore
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: android-debug-keystore-v1
+
+      - name: Build release APK
+        run: flutter build apk --release
+
+      - name: Show artifact info
+        run: |
+          ls -lh build/app/outputs/flutter-apk/
+          APKSIGNER=$(ls "$ANDROID_HOME"/build-tools/*/apksigner 2>/dev/null | sort -V | tail -1)
+          if [[ -n "$APKSIGNER" ]]; then
+            "$APKSIGNER" verify --print-certs build/app/outputs/flutter-apk/app-release.apk || true
+          fi
+
+      - name: Upload release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: kgka-music-release-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+          retention-days: 30

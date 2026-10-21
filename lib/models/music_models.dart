@@ -440,6 +440,7 @@ class Song {
     this.albumName,
     this.coverUrl,
     this.duration,
+    this.releaseDate,
     this.artists = const [],
     this.isCloudDrive = false,
     this.source = SongSource.kugou,
@@ -454,6 +455,17 @@ class Song {
   final String? albumName;
   final String? coverUrl;
   final Duration? duration;
+
+  /// 发行日期（精确到日）。
+  ///
+  /// - 酷狗：`PublishDate`，本身就是 `2003-07-31` 这种日期字符串
+  /// - 网易云：歌曲层 `publishTime`，毫秒时间戳，实测是当天 00:00（北京时间）
+  ///
+  /// 接口没给时为空，界面显示「未知」。
+  final DateTime? releaseDate;
+
+  /// 发行年份（[releaseDate] 的便捷取值）。
+  int? get releaseYear => releaseDate?.year;
   final List<ArtistRef> artists;
 
   /// 标记是否为云盘歌曲。云盘歌曲的播放地址需通过 `/user/cloud/url` 获取。
@@ -525,6 +537,7 @@ class Song {
       albumName: asString(json['AlbumName']) ?? asString(json['album_name']),
       coverUrl: normalizeImageUrl(imageUrl),
       artists: artists,
+      releaseDate: releaseDateFromSongJson(json),
       duration:
           durationFromSeconds(json['Duration']) ??
           durationFromMilliseconds(json['timelen']) ??
@@ -557,6 +570,7 @@ class Song {
         asString(json['album_sizable_cover']),
       ),
       duration: durationFromMilliseconds(json['timelength']),
+      releaseDate: releaseDateFromSongJson(json),
       artists: parseArtists(json, fallbackName: author),
     );
   }
@@ -581,6 +595,7 @@ class Song {
       artists: artists,
       // /top/card 的 time_length 是带小数的秒数（如 259.16）。
       duration: durationFromTopCardSeconds(json['time_length']),
+      releaseDate: releaseDateFromSongJson(json),
     );
   }
 
@@ -609,6 +624,7 @@ class Song {
       coverUrl: normalizeImageUrl(asString(json['sizable_cover'])),
       artists: artists,
       duration: durationFromSeconds(json['time_length']),
+      releaseDate: releaseDateFromSongJson(json),
     );
   }
 
@@ -629,6 +645,7 @@ class Song {
       coverUrl: normalizeImageUrl(asString(transParam['union_cover'])),
       artists: artists,
       duration: durationFromSeconds(json['time_length']),
+      releaseDate: releaseDateFromSongJson(json),
     );
   }
 
@@ -657,6 +674,7 @@ class Song {
       ),
       artists: artists,
       duration: durationFromMilliseconds(json['timelen']),
+      releaseDate: releaseDateFromSongJson(json),
     );
   }
 
@@ -693,6 +711,7 @@ class Song {
             asString(json['cover']),
       ),
       artists: artists,
+      releaseDate: releaseDateFromSongJson(json),
       duration:
           durationFromMilliseconds(json['timelength']) ??
           durationFromMilliseconds(json['timelen']),
@@ -744,6 +763,7 @@ class Song {
             asString(json['imgurl']),
       ),
       artists: artists,
+      releaseDate: releaseDateFromSongJson(json),
       duration:
           durationFromMilliseconds(json['time']) ??
           durationFromMilliseconds(json['320time']) ??
@@ -787,6 +807,7 @@ class Song {
       coverUrl: normalizeImageUrl(asString(albumInfo['cover'])),
       artists: artists,
       duration: durationFromMilliseconds(audioInfo['duration']),
+      releaseDate: releaseDateFromSongJson(json),
     );
   }
 
@@ -800,6 +821,8 @@ class Song {
         'albumName': albumName,
         'coverUrl': coverUrl,
         'durationMs': duration?.inMilliseconds,
+        // 发行日期必须持久化：否则重启后从缓存恢复的歌曲会显示「未知」
+        'releaseDate': releaseDate?.toIso8601String(),
         'artists': artists
             .map((a) => {
                   'id': a.id,
@@ -821,6 +844,7 @@ class Song {
       albumName: asString(json['albumName']),
       coverUrl: asString(json['coverUrl']),
       duration: durationFromMilliseconds(json['durationMs']),
+      releaseDate: releaseDateFromSongJson(json),
       artists: asList(json['artists'])
           .whereType<Map<String, dynamic>>()
           .map((a) => ArtistRef(
@@ -1838,15 +1862,116 @@ Duration? durationFromMilliseconds(Object? value) {
   return milliseconds == null ? null : Duration(milliseconds: milliseconds);
 }
 
+/// 从歌曲 JSON 里提取发行日期，兼容各接口的不同命名。
+///
+/// 酷狗不同接口的字段名不一致：
+/// - `/search`：`PublishDate`（`2003-07-31`）
+/// - 歌单 / 专辑 / 排行榜：`publish_date`，或在 `albuminfo.publish_time` 里
+/// - 部分接口只有 `publish_time`
+DateTime? releaseDateFromSongJson(Map<String, dynamic> json) {
+  // 直接日期字符串
+  for (final key in const [
+    'PublishDate',
+    'publish_date',
+    'publishDate',
+    'release_date',
+    'releaseDate',
+  ]) {
+    final parsed = releaseDateFromString(json[key]);
+    if (parsed != null) return parsed;
+  }
+
+  // 毫秒 / 秒时间戳
+  for (final key in const ['publish_time', 'publishTime', 'release_time']) {
+    final parsed = releaseDateFromMillis(json[key], allowSeconds: true);
+    if (parsed != null) return parsed;
+  }
+
+  // 专辑信息里可能带日期
+  final albumInfo = json['albuminfo'];
+  if (albumInfo is Map) {
+    final albumDate = releaseDateFromString(albumInfo['publish_time']) ??
+        releaseDateFromMillis(albumInfo['publish_time'], allowSeconds: true) ??
+        releaseDateFromString(albumInfo['publish_date']);
+    if (albumDate != null) return albumDate;
+  }
+
+  return null;
+}
+
+/// 从日期字符串里解析出发行日期（精确到日）。
+///
+/// 兼容酷狗 `PublishDate` 的几种形态：`2003-07-31`、`2003/07/31`、
+/// `2003年07月31日`，以及只给年份的 `2003`。
+/// 解析不出来时返回 null，界面显示「未知」，不用当前日期兜底。
+DateTime? releaseDateFromString(Object? value) {
+  final text = asString(value)?.trim();
+  if (text == null || text.isEmpty) return null;
+
+  // 2003-07-31 / 2003/07/31 / 2003.07.31 / 2003年07月31日
+  final full = RegExp(
+    r'^(\d{4})\s*[-/.年]\s*(\d{1,2})\s*[-/.月]\s*(\d{1,2})',
+  ).firstMatch(text);
+  if (full != null) {
+    final year = int.tryParse(full.group(1)!);
+    final month = int.tryParse(full.group(2)!);
+    final day = int.tryParse(full.group(3)!);
+    if (year != null && month != null && day != null) {
+      final date = DateTime(year, month, day);
+      // 防止 2003-02-31 这种非法日期被 DateTime 自动进位
+      if (date.year == year && date.month == month && date.day == day) {
+        return date;
+      }
+      return null;
+    }
+  }
+
+  // 只有年份
+  final yearOnly = RegExp(r'^(\d{4})$').firstMatch(text);
+  if (yearOnly != null) {
+    final year = int.tryParse(yearOnly.group(1)!);
+    if (year != null && year > 0) return DateTime(year, 1, 1);
+  }
+
+  final parsed = DateTime.tryParse(text);
+  return parsed;
+}
+
+/// 从毫秒时间戳解析发行日期。
+///
+/// 网易云 `publishTime` 是北京时间当天 00:00 的毫秒值
+/// （例如 `1059580800000` = 2003-07-31 00:00 +08:00）。
+/// 这里固定按 UTC+8 换算，否则设备在其它时区（如 UTC）会被算成前一天。
+DateTime? releaseDateFromMillis(Object? value, {bool allowSeconds = false}) {
+  var ms = asInt(value);
+  if (ms == null || ms <= 0) return null;
+  // 有些接口给的是秒级时间戳（10 位），按毫秒处理会跑到 1970 年
+  if (allowSeconds && ms < 100000000000) {
+    ms = ms * 1000;
+  }
+  const beijingOffset = Duration(hours: 8);
+  final beijing = DateTime.fromMillisecondsSinceEpoch(
+    ms,
+    isUtc: true,
+  ).add(beijingOffset);
+  return DateTime(beijing.year, beijing.month, beijing.day);
+}
+
 String? normalizeImageUrl(String? url, {int size = 480}) {
   if (url == null) {
     return null;
   }
-  return url
+  var normalized = url
       .replaceAll('{size}', '$size')
       .replaceAll('{SIZE}', '$size')
       .replaceAll('/{size}/', '/$size/')
       .replaceAll('/{SIZE}/', '/$size/');
+  // 网易云图片 CDN 是 http 直链，iOS 的 ATS 会直接拦掉，统一升级为 https。
+  if (normalized.startsWith('http://') &&
+      normalized.contains('music.126.net')) {
+    normalized = 'https://${normalized.substring(7)}';
+  }
+  return normalized;
 }
 
 String formatDuration(Duration? duration) {
@@ -2006,6 +2131,7 @@ class NetEaseSong {
     required this.artists,
     required this.album,
     required this.duration,
+    this.publishTime,
   });
 
   final int id;
@@ -2013,6 +2139,11 @@ class NetEaseSong {
   final List<NetEaseArtist> artists;
   final NetEaseAlbum album;
   final Duration duration;
+
+  /// 发行时间（毫秒时间戳）。
+  ///
+  /// 网易云把它放在歌曲层 `publishTime`，不在 `al` 里（`al.publishTime` 恒为空）。
+  final int? publishTime;
 
   /// 转换为 [Song]，标记来源为网易云。
   Song toSong() {
@@ -2025,8 +2156,9 @@ class NetEaseSong {
       albumId: '${album.id}',
       albumAudioId: '$id',
       albumName: album.name,
-      coverUrl: album.picUrl,
+      coverUrl: normalizeImageUrl(album.picUrl),
       duration: duration,
+      releaseDate: releaseDateFromMillis(publishTime),
       artists: artists
           .map((a) => ArtistRef(id: '${a.id}', name: a.name))
           .where((a) => a.name.isNotEmpty)
@@ -2046,6 +2178,7 @@ class NetEaseSong {
           .toList(),
       album: NetEaseAlbum.fromJson(asMap(json['al'])),
       duration: durationFromMilliseconds(json['dt']) ?? Duration.zero,
+      publishTime: asInt(json['publishTime']),
     );
   }
 }
