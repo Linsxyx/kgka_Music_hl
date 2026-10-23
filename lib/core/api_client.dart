@@ -56,14 +56,13 @@ class ApiClient {
       'Content-Type': 'application/json',
     };
 
-    if (token case final value?) {
-      //headers['Authorization'] = 'Bearer $value';
+    if (token case final value? when value.isNotEmpty) {
       headers['X-Kg-Session-Id'] = value;
     }
-    if (t1 case final value?) {
+    if (t1 case final value? when value.isNotEmpty) {
       headers['t1'] = value;
     }
-    if (sessionId case final value?) {
+    if (sessionId case final value? when value.isNotEmpty) {
       headers['X-Kg-Session-Id'] = value;
     }
 

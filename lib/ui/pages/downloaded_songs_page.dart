@@ -12,6 +12,7 @@ import '../../services/music_api.dart';
 import '../widgets/artwork.dart';
 import '../adaptive_layout.dart';
 import '../widgets/liquid_glass_ui.dart';
+import '../widgets/mini_player.dart';
 import '../widgets/status_bar_overlay.dart';
 
 /// 已下载歌曲与播放缓存管理页。
@@ -68,6 +69,7 @@ class _DownloadedSongsPageState extends State<DownloadedSongsPage>
             ],
           ),
         ),
+        extendBody: true,
         body: AdaptiveContentPadding(
           child: TabBarView(
             controller: _tabController,
@@ -80,6 +82,16 @@ class _DownloadedSongsPageState extends State<DownloadedSongsPage>
               ),
               _PlayCacheList(downloads: widget.downloads),
             ],
+          ),
+        ),
+        bottomNavigationBar: SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: MiniPlayer(
+              player: widget.player,
+              auth: widget.auth,
+            ),
           ),
         ),
         ),

@@ -22,7 +22,6 @@ import '../widgets/artwork.dart';
 import '../widgets/now_playing_badge.dart';
 import '../widgets/song_action_sheets.dart';
 import '../widgets/toast.dart';
-import 'album_shop_page.dart';
 import 'artist_detail_page.dart';
 import 'playlist_detail_page.dart';
 import 'search_page.dart';
@@ -71,10 +70,19 @@ class _HomePageState extends State<HomePage> {
   var _sectionIndex = 0;
   var _updateBannerDismissed = false;
   var _autoUpdateDialogShown = false;
+  static const _shortVideoFmStation = FmStation(
+    id: '1048',
+    name: '短视频热门歌',
+    type: 2,
+  );
   var _isStartingPersonalFm = false;
   var _isLoadingPersonalFmPreview = false;
   var _hasRequestedPersonalFmPreview = false;
   List<Song> _personalFmPreviewSongs = const [];
+  var _isStartingShortVideoFm = false;
+  var _isLoadingShortVideoFmPreview = false;
+  var _hasRequestedShortVideoFmPreview = false;
+  List<Song> _shortVideoFmPreviewSongs = const [];
 
   @override
   void initState() {
@@ -95,6 +103,7 @@ class _HomePageState extends State<HomePage> {
     widget.auth.addListener(_handleAuthChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _loadPersonalFmPreview();
+      _loadShortVideoFmPreview();
     });
     if (AppUpdateService.isSupportedPlatform) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _checkForUpdates());
@@ -331,7 +340,8 @@ class _HomePageState extends State<HomePage> {
     final fmFuture = !widget.player.isPersonalFmActive
         ? _loadPersonalFmPreview(force: true)
         : Future<void>.value();
-    await Future.wait([future, fmFuture]);
+    final shortVideoFuture = _loadShortVideoFmPreview(force: true);
+    await Future.wait([future, fmFuture, shortVideoFuture]);
   }
 
   Future<void> _checkForUpdates() async {
@@ -509,17 +519,65 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  void _openAlbumShop() {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => AlbumShopPage(
-          api: widget.api,
-          auth: widget.auth,
-          player: widget.player,
-          initialAlbums: _cachedData?.albums ?? [],
-        ),
-      ),
-    );
+  Future<void> _loadShortVideoFmPreview({bool force = false}) async {
+    if (force) {
+      _hasRequestedShortVideoFmPreview = false;
+    }
+    if (!mounted ||
+        _isLoadingShortVideoFmPreview ||
+        _hasRequestedShortVideoFmPreview) {
+      return;
+    }
+
+    _hasRequestedShortVideoFmPreview = true;
+    setState(() => _isLoadingShortVideoFmPreview = true);
+    try {
+      final songs = await widget.api.fmSongs(_shortVideoFmStation);
+      if (!mounted) {
+        return;
+      }
+      if (songs.isNotEmpty) {
+        setState(() => _shortVideoFmPreviewSongs = songs);
+      } else {
+        _hasRequestedShortVideoFmPreview = false;
+      }
+    } catch (_) {
+      _hasRequestedShortVideoFmPreview = false;
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingShortVideoFmPreview = false);
+      }
+    }
+  }
+
+  Future<void> _startShortVideoFm() async {
+    if (_isStartingShortVideoFm) {
+      return;
+    }
+    setState(() => _isStartingShortVideoFm = true);
+    try {
+      var songs = _shortVideoFmPreviewSongs;
+      if (songs.isEmpty) {
+        songs = await widget.api.fmSongs(_shortVideoFmStation);
+        if (mounted && songs.isNotEmpty) {
+          setState(() => _shortVideoFmPreviewSongs = songs);
+        }
+      }
+      if (!mounted) return;
+      if (songs.isEmpty) {
+        Toast.info('短视频热门歌电台暂时没有可播放歌曲');
+        return;
+      }
+      await widget.player.playSong(songs.first, queue: songs);
+    } catch (error) {
+      if (mounted) {
+        Toast.error('短视频热门歌加载失败：$error');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isStartingShortVideoFm = false);
+      }
+    }
   }
 
   void _openSettings() {
@@ -606,7 +664,14 @@ class _HomePageState extends State<HomePage> {
                           personalFmPreviewSong: _personalFmPreviewSongs.isEmpty
                               ? null
                               : _personalFmPreviewSongs.first,
-                          onAlbumTap: _openAlbumShop,
+                          onShortVideoFmPlay: _startShortVideoFm,
+                          isShortVideoFmLoading:
+                              _isStartingShortVideoFm ||
+                              _isLoadingShortVideoFmPreview,
+                          shortVideoFmPreviewSong:
+                              _shortVideoFmPreviewSongs.isEmpty
+                                  ? null
+                                  : _shortVideoFmPreviewSongs.first,
                           api: widget.api,
                           player: widget.player,
                           updateVersion: _updateBannerDismissed
@@ -697,7 +762,9 @@ class _RecommendHeader extends StatelessWidget {
     required this.onPersonalFmPlay,
     required this.isPersonalFmLoading,
     required this.personalFmPreviewSong,
-    required this.onAlbumTap,
+    required this.onShortVideoFmPlay,
+    required this.isShortVideoFmLoading,
+    required this.shortVideoFmPreviewSong,
     required this.api,
     required this.player,
     required this.updateVersion,
@@ -713,7 +780,9 @@ class _RecommendHeader extends StatelessWidget {
   final VoidCallback onPersonalFmPlay;
   final bool isPersonalFmLoading;
   final Song? personalFmPreviewSong;
-  final VoidCallback onAlbumTap;
+  final VoidCallback onShortVideoFmPlay;
+  final bool isShortVideoFmLoading;
+  final Song? shortVideoFmPreviewSong;
   final MusicApi api;
   final PlayerController player;
   final AppVersionInfo? updateVersion;
@@ -782,7 +851,9 @@ class _RecommendHeader extends StatelessWidget {
                           onPersonalFmPlay: onPersonalFmPlay,
                           isPersonalFmLoading: isPersonalFmLoading,
                           personalFmPreviewSong: personalFmPreviewSong,
-                          onAlbumTap: onAlbumTap,
+                          onShortVideoFmPlay: onShortVideoFmPlay,
+                          isShortVideoFmLoading: isShortVideoFmLoading,
+                          shortVideoFmPreviewSong: shortVideoFmPreviewSong,
                         ),
                       ),
                       Expanded(
@@ -804,7 +875,9 @@ class _RecommendHeader extends StatelessWidget {
                     onPersonalFmPlay: onPersonalFmPlay,
                     isPersonalFmLoading: isPersonalFmLoading,
                     personalFmPreviewSong: personalFmPreviewSong,
-                    onAlbumTap: onAlbumTap,
+                    onShortVideoFmPlay: onShortVideoFmPlay,
+                    isShortVideoFmLoading: isShortVideoFmLoading,
+                    shortVideoFmPreviewSong: shortVideoFmPreviewSong,
                   ),
                   if (isCarMode)
                     _CarQuickStatsPills(
@@ -963,7 +1036,9 @@ class _FeatureShelf extends StatelessWidget {
     required this.onPersonalFmPlay,
     required this.isPersonalFmLoading,
     required this.personalFmPreviewSong,
-    required this.onAlbumTap,
+    required this.onShortVideoFmPlay,
+    required this.isShortVideoFmLoading,
+    required this.shortVideoFmPreviewSong,
   });
 
   final List<AlbumShopItem> albums;
@@ -971,7 +1046,9 @@ class _FeatureShelf extends StatelessWidget {
   final VoidCallback onPersonalFmPlay;
   final bool isPersonalFmLoading;
   final Song? personalFmPreviewSong;
-  final VoidCallback onAlbumTap;
+  final VoidCallback onShortVideoFmPlay;
+  final bool isShortVideoFmLoading;
+  final Song? shortVideoFmPreviewSong;
 
   @override
   Widget build(BuildContext context) {
@@ -1012,28 +1089,20 @@ class _FeatureShelf extends StatelessWidget {
                 ),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: albums.isNotEmpty
-                      ? _FeatureCard(
-                          title: '新碟上架',
-                          subtitle:
-                              '${albums.first.singerName} · ${albums.first.albumName}',
-                          imageUrl: albums.first.coverUrl,
-                          gradient: const [
-                            Color(0xFF454A92),
-                            Color(0xFF78CAFF),
-                          ],
-                          onTap: onAlbumTap,
-                        )
-                      : _FeatureCard(
-                          title: '新碟上架',
-                          subtitle: '暂无新专辑',
-                          imageUrl: null,
-                          gradient: const [
-                            Color(0xFF454A92),
-                            Color(0xFF78CAFF),
-                          ],
-                          onTap: () {},
-                        ),
+                  child: _FeatureCard(
+                    title: '短视频热歌',
+                    subtitle: shortVideoFmPreviewSong != null
+                        ? '${shortVideoFmPreviewSong!.artist} · ${shortVideoFmPreviewSong!.title}'
+                        : '电台 · 短视频热门歌',
+                    imageUrl: shortVideoFmPreviewSong?.coverUrl ??
+                        (albums.isNotEmpty ? albums.first.coverUrl : null),
+                    gradient: const [
+                      Color(0xFF454A92),
+                      Color(0xFF78CAFF),
+                    ],
+                    loading: isShortVideoFmLoading,
+                    onTap: onShortVideoFmPlay,
+                  ),
                 ),
               ],
             ),

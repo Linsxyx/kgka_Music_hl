@@ -16,6 +16,7 @@ import 'downloaded_songs_page.dart';
 import 'playback_history_page.dart';
 import 'playlist_detail_page.dart';
 import 'settings_page.dart';
+import 'vip_info_page.dart';
 import 'local_songs_page.dart';
 import '../../controllers/local_music_controller.dart';
 import '../../core/pinyin_utils.dart';
@@ -328,7 +329,17 @@ class _LibraryPageState extends State<LibraryPage> {
                   SliverToBoxAdapter(
                     child: Padding(
                       padding: const EdgeInsets.fromLTRB(18, 12, 18, 0),
-                      child: _UserProfileHeader(auth: widget.auth),
+                      child: _UserProfileHeader(
+                        auth: widget.auth,
+                        onOpenVip: () => Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => VipInfoPage(
+                              api: widget.api,
+                              auth: widget.auth,
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
                   ),
 
@@ -357,6 +368,7 @@ class _LibraryPageState extends State<LibraryPage> {
                             builder: (_) => LocalSongsPage(
                               player: widget.player,
                               localMusic: widget.localMusic,
+                              auth: widget.auth,
                             ),
                           ),
                         ),
@@ -528,9 +540,10 @@ class _LibraryPageState extends State<LibraryPage> {
 // --- 1. 用户资料头部 (User Profile Header) ---
 
 class _UserProfileHeader extends StatelessWidget {
-  const _UserProfileHeader({required this.auth});
+  const _UserProfileHeader({required this.auth, this.onOpenVip});
 
   final AuthController auth;
+  final VoidCallback? onOpenVip;
 
   @override
   Widget build(BuildContext context) {
@@ -616,27 +629,84 @@ class _UserProfileHeader extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 5),
-                Row(
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    Container(
-                      width: 7.5,
-                      height: 7.5,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: auth.isLoggedIn
-                            ? const Color(0xFF4CAF50)
-                            : colorScheme.onSurfaceVariant.withValues(alpha: .45),
-                      ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          width: 7.5,
+                          height: 7.5,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: auth.isLoggedIn
+                                ? const Color(0xFF4CAF50)
+                                : colorScheme.onSurfaceVariant.withValues(alpha: .45),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          auth.isLoggedIn ? '已登录' : '未登录',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 12.5,
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 6),
-                    Text(
-                      auth.isLoggedIn ? '已登录' : '未登录',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 12.5,
+                    if (auth.isLoggedIn)
+                      GestureDetector(
+                        onTap: onOpenVip,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2.5,
+                          ),
+                          decoration: BoxDecoration(
+                            gradient: auth.vipInfo?.hasActiveVip == true
+                                ? const LinearGradient(
+                                    colors: [
+                                      Color(0xFFF7D774),
+                                      Color(0xFFE8A33D),
+                                    ],
+                                  )
+                                : null,
+                            color: auth.vipInfo?.hasActiveVip == true
+                                ? null
+                                : colorScheme.surfaceContainerHighest,
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.workspace_premium_rounded,
+                                size: 13,
+                                color: auth.vipInfo?.hasActiveVip == true
+                                    ? const Color(0xFF4A2B00)
+                                    : colorScheme.onSurfaceVariant,
+                              ),
+                              const SizedBox(width: 3),
+                              Text(
+                                auth.vipInfo?.hasActiveVip == true
+                                    ? '${auth.vipInfo!.displayLabel}${auth.vipInfo!.primaryEndTime != null ? ' · ${auth.vipInfo!.primaryEndTime!.split(' ').first}到期' : ''}'
+                                    : '每日VIP福利',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                  color: auth.vipInfo?.hasActiveVip == true
+                                      ? const Color(0xFF4A2B00)
+                                      : colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
-                    ),
                   ],
                 ),
               ],

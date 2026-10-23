@@ -1217,6 +1217,24 @@ class _PlaylistDetailPageState extends State<PlaylistDetailPage> {
                         ),
                         icon: const Icon(Icons.playlist_add_rounded),
                       ),
+                    if (!widget.readOnly &&
+                        !_isAlbum &&
+                        (!_isInLibrary ||
+                            (!_libraryPlaylist.isLikedPlaylist &&
+                                !_libraryPlaylist.isCreatedPlaylist)))
+                      IconButton(
+                        tooltip: _isInLibrary ? '取消收藏歌单' : '收藏歌单',
+                        onPressed: _isMutating
+                            ? null
+                            : (_isInLibrary
+                                  ? _deleteOrUncollectPlaylist
+                                  : _collectPlaylist),
+                        icon: Icon(
+                          _isInLibrary
+                              ? Icons.bookmark_added_rounded
+                              : Icons.bookmark_add_outlined,
+                        ),
+                      ),
                     if (_isMutating)
                       const Padding(
                         padding: EdgeInsets.only(right: 16),

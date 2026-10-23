@@ -1053,41 +1053,6 @@ class _LandscapeRightPanel extends StatelessWidget {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (song != null)
-              Padding(
-                padding: EdgeInsets.only(
-                  bottom: veryTight ? 6.0 : 12.0,
-                  top: veryTight ? 2.0 : 6.0,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    MarqueeText(
-                      text: song.title,
-                      textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            color: Colors.white.withValues(alpha: .92),
-                            fontSize: compact ? 18 : 22,
-                            fontWeight: FontWeight.w900,
-                          ),
-                    ),
-                    const SizedBox(height: 4),
-                    ClickableArtistText(
-                      song: song,
-                      api: player.api,
-                      auth: auth,
-                      player: player,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Colors.white.withValues(alpha: .6),
-                            fontWeight: FontWeight.w600,
-                          ),
-                    ),
-                  ],
-                ),
-              ),
             Expanded(
               child: _LandscapeLyricPanel(
                 player: player,
@@ -1131,6 +1096,8 @@ class _LandscapeLyricPanel extends StatefulWidget {
 }
 
 class _LandscapeLyricPanelState extends State<_LandscapeLyricPanel> {
+  static const _lyricScaleKey = 'settings.lyric_scale';
+
   late final LyricController _lyricController;
   late final Ticker _ticker;
   bool _isUserSelecting = false;
@@ -1138,12 +1105,16 @@ class _LandscapeLyricPanelState extends State<_LandscapeLyricPanel> {
   List<LyricLine> _loadedLyrics = const [];
   /// 上次的准备状态快照：isPreparing 变化时也要刷新（"正在准备音乐..."->"暂无歌词"）。
   bool _lastPreparing = false;
+  double _lyricScale = 1.0;
+  late _LyricDisplayMode _displayMode;
 
   @override
   void initState() {
     super.initState();
     _loadedLyrics = widget.lyrics;
     _lastPreparing = widget.player.isPreparing;
+    _displayMode = _initialDisplayMode(_loadedLyrics);
+    _loadLyricScale();
     _lyricController = LyricController();
     _lyricController.setOnTapLineCallback((position) {
       widget.player.seek(position);
@@ -1158,6 +1129,45 @@ class _LandscapeLyricPanelState extends State<_LandscapeLyricPanel> {
     _syncTicker();
   }
 
+  Future<void> _loadLyricScale() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (mounted) {
+      setState(() => _lyricScale = prefs.getDouble(_lyricScaleKey) ?? 1.0);
+    }
+  }
+
+  Future<void> _setLyricScale(double scale) async {
+    final clamped = scale.clamp(0.7, 1.6);
+    setState(() => _lyricScale = clamped);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setDouble(_lyricScaleKey, clamped);
+  }
+
+  _LyricDisplayMode _initialDisplayMode(List<LyricLine> lyrics) {
+    final modes = _availableLyricDisplayModes(lyrics);
+    return modes.isNotEmpty ? modes.first : _LyricDisplayMode.lyricsOnly;
+  }
+
+  _LyricDisplayMode _normalizeDisplayMode(
+    List<LyricLine> lyrics,
+    _LyricDisplayMode currentMode,
+  ) {
+    final modes = _availableLyricDisplayModes(lyrics);
+    if (modes.contains(currentMode)) return currentMode;
+    return modes.isNotEmpty ? modes.first : _LyricDisplayMode.lyricsOnly;
+  }
+
+  void _toggleDisplayMode() {
+    final modes = _availableLyricDisplayModes(_loadedLyrics);
+    if (modes.length <= 1) return;
+    final idx = modes.indexOf(_displayMode);
+    final nextIdx = idx >= 0 ? (idx + 1) % modes.length : 0;
+    setState(() {
+      _displayMode = modes[nextIdx];
+      _syncLyrics();
+    });
+  }
+
   @override
   void didUpdateWidget(covariant _LandscapeLyricPanel oldWidget) {
     super.didUpdateWidget(oldWidget);
@@ -1168,6 +1178,7 @@ class _LandscapeLyricPanelState extends State<_LandscapeLyricPanel> {
     if (oldWidget.songHash != widget.songHash ||
         oldWidget.lyrics != widget.lyrics) {
       _loadedLyrics = widget.lyrics;
+      _displayMode = _normalizeDisplayMode(_loadedLyrics, _displayMode);
       _syncLyrics();
     }
     _syncTicker();
@@ -1196,6 +1207,7 @@ class _LandscapeLyricPanelState extends State<_LandscapeLyricPanel> {
     if (changed) {
       _loadedLyrics = current;
       _lastPreparing = widget.player.isPreparing;
+      _displayMode = _normalizeDisplayMode(_loadedLyrics, _displayMode);
       setState(() {
         _syncLyrics();
         _syncTicker();
@@ -1208,7 +1220,12 @@ class _LandscapeLyricPanelState extends State<_LandscapeLyricPanel> {
   void _syncLyrics() {
     final lyrics = _loadedLyrics;
     if (lyrics.isNotEmpty) {
-      final model = convertToFlutterLyricModel(lyrics);
+      final mode = _normalizeDisplayMode(lyrics, _displayMode);
+      final model = convertToFlutterLyricModel(
+        lyrics,
+        showTranslation: mode == _LyricDisplayMode.lyricsWithTranslation,
+        showRomanization: mode == _LyricDisplayMode.lyricsWithRomanization,
+      );
       _lyricController.loadLyricModel(model);
     }
   }
@@ -1250,37 +1267,88 @@ class _LandscapeLyricPanelState extends State<_LandscapeLyricPanel> {
       );
     }
 
-    final fontSize = widget.compact ? 26.0 : 34.0;
-    final inactiveFontSize = widget.compact ? 18.0 : 24.0;
+    final fontSize = (widget.compact ? 26.0 : 34.0) * _lyricScale;
+    final inactiveFontSize = (widget.compact ? 18.0 : 24.0) * _lyricScale;
+    final translationFontSize = (widget.compact ? 14.0 : 18.0) * _lyricScale;
+    final availableModes = _availableLyricDisplayModes(lyrics);
+    final canToggleMode = availableModes.length > 1;
+    final displayMode = _normalizeDisplayMode(lyrics, _displayMode);
 
-    return ExcludeSemantics(
-      // 歌词视图高频更新会触发 Windows AXTree 竞态崩溃，排除语义树
-      child: LyricView(
-        controller: _lyricController,
-        style: LyricStyles.default1.copyWith(
-          textStyle: Theme.of(context).textTheme.titleLarge!.copyWith(
-            color: Colors.white.withValues(alpha: .34),
-            fontSize: inactiveFontSize,
-            height: 1.18,
-            fontWeight: FontWeight.w800,
+    return Stack(
+      children: [
+        ExcludeSemantics(
+          // 歌词视图高频更新会触发 Windows AXTree 竞态崩溃，排除语义树
+          child: LyricView(
+            controller: _lyricController,
+            style: LyricStyles.default1.copyWith(
+              textStyle: Theme.of(context).textTheme.titleLarge!.copyWith(
+                color: Colors.white.withValues(alpha: .34),
+                fontSize: inactiveFontSize,
+                height: 1.18,
+                fontWeight: FontWeight.w800,
+              ),
+              activeStyle: Theme.of(context).textTheme.headlineMedium!.copyWith(
+                color: Colors.white.withValues(alpha: .34),
+                fontSize: fontSize,
+                height: 1.18,
+                fontWeight: FontWeight.w900,
+              ),
+              translationStyle: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                color: Colors.white.withValues(alpha: .42),
+                fontSize: translationFontSize,
+                height: 1.24,
+                fontWeight: FontWeight.w700,
+              ),
+              lineGap: widget.compact ? 10 : 16,
+              contentPadding: EdgeInsets.symmetric(
+                horizontal: 24,
+                vertical: widget.compact ? 16 : 32,
+              ),
+              fadeRange: FadeRange(top: 32, bottom: 32),
+              textAlign: TextAlign.left,
+              contentAlignment: CrossAxisAlignment.start,
+              activeHighlightColor: Colors.white,
+            ),
           ),
-          activeStyle: Theme.of(context).textTheme.headlineMedium!.copyWith(
-            color: Colors.white.withValues(alpha: .34),
-            fontSize: fontSize,
-            height: 1.18,
-            fontWeight: FontWeight.w900,
-          ),
-          lineGap: widget.compact ? 10 : 16,
-          contentPadding: EdgeInsets.symmetric(
-            horizontal: 24,
-            vertical: widget.compact ? 20 : 40,
-          ),
-          fadeRange: FadeRange(top: 40, bottom: 40),
-          textAlign: TextAlign.left,
-          contentAlignment: CrossAxisAlignment.start,
-          activeHighlightColor: Colors.white,
         ),
-      ),
+        Positioned(
+          right: 4,
+          bottom: 4,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _GlassIconButton(
+                tooltip: '缩小歌词',
+                size: 32,
+                onPressed: () => _setLyricScale(_lyricScale - 0.1),
+                icon: Icons.text_decrease_rounded,
+              ),
+              const SizedBox(width: 6),
+              _GlassIconButton(
+                tooltip: '放大歌词',
+                size: 32,
+                onPressed: () => _setLyricScale(_lyricScale + 0.1),
+                icon: Icons.text_increase_rounded,
+              ),
+              if (canToggleMode) ...[
+                const SizedBox(width: 6),
+                _GlassIconButton(
+                  tooltip: '切换歌词模式（当前：${_lyricDisplayModeLabel(displayMode)}）',
+                  size: 32,
+                  onPressed: _toggleDisplayMode,
+                  icon: switch (displayMode) {
+                    _LyricDisplayMode.lyricsWithTranslation =>
+                      Icons.translate_rounded,
+                    _LyricDisplayMode.lyricsWithRomanization =>
+                      Icons.record_voice_over_rounded,
+                    _LyricDisplayMode.lyricsOnly => Icons.lyrics_rounded,
+                  },
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
@@ -1702,11 +1770,16 @@ class _PosterLyricPreviewState extends State<_PosterLyricPreview> {
   late final Ticker _ticker;
   final _positionNotifier = ValueNotifier<Duration>(Duration.zero);
   int _currentIndex = -1;
+  List<LyricLine> _lastLyrics = const [];
+  bool _lastIsPreparing = false;
 
   @override
   void initState() {
     super.initState();
     _positionNotifier.value = widget.player.smoothPosition;
+    _lastLyrics = widget.player.lyrics;
+    _lastIsPreparing = widget.player.isPreparing;
+    _currentIndex = _activeLyricIndexFor(_lastLyrics, _positionNotifier.value);
     _ticker = Ticker(_onTick);
     widget.player.addListener(_syncTicker);
     _syncTicker();
@@ -1734,6 +1807,20 @@ class _PosterLyricPreviewState extends State<_PosterLyricPreview> {
   }
 
   void _syncTicker() {
+    final lyricsChanged = !identical(widget.player.lyrics, _lastLyrics);
+    final preparingChanged = widget.player.isPreparing != _lastIsPreparing;
+    if (lyricsChanged || preparingChanged) {
+      _lastLyrics = widget.player.lyrics;
+      _lastIsPreparing = widget.player.isPreparing;
+      _positionNotifier.value = widget.player.smoothPosition;
+      _currentIndex = _activeLyricIndexFor(
+        _lastLyrics,
+        _positionNotifier.value,
+      );
+      if (mounted) {
+        setState(() {});
+      }
+    }
     final shouldTick =
         widget.isPageVisible &&
         widget.player.isPlaying &&
@@ -1987,12 +2074,14 @@ class _LyricPlayerPageState extends State<_LyricPlayerPage>
   double _lyricScale = 1.0;
 
   bool _lastLyricBlurEnabled = false;
+  bool _lastIsPreparing = false;
 
   @override
   void initState() {
     super.initState();
     _lastLyrics = widget.player.lyrics;
     _lastLyricBlurEnabled = widget.player.lyricBlurEnabled;
+    _lastIsPreparing = widget.player.isPreparing;
     _displayMode = _initialLyricDisplayMode(_lastLyrics);
     _loadLyricScale();
     widget.player.addListener(_onPlayerLyricsChanged);
@@ -2006,9 +2095,13 @@ class _LyricPlayerPageState extends State<_LyricPlayerPage>
 
   void _onPlayerLyricsChanged() {
     final blurChanged = widget.player.lyricBlurEnabled != _lastLyricBlurEnabled;
-    if (widget.player.lyrics != _lastLyrics || blurChanged) {
+    final preparingChanged = widget.player.isPreparing != _lastIsPreparing;
+    if (widget.player.lyrics != _lastLyrics ||
+        blurChanged ||
+        preparingChanged) {
       _lastLyrics = widget.player.lyrics;
       _lastLyricBlurEnabled = widget.player.lyricBlurEnabled;
+      _lastIsPreparing = widget.player.isPreparing;
       setState(() {
         _displayMode = _normalizeLyricDisplayMode(
           _lastLyrics,

@@ -218,6 +218,7 @@ class PlayerController extends ChangeNotifier {
   Timer? _listenTimeTimer;
   Timer? _queueSaveTimer;
   Timer? _positionSaveTimer;
+  Timer? _playCacheTimer;
   DateTime? _listenTimeStartedAt;
   Duration _pendingListenTime = Duration.zero;
   bool _isReportingListenTime = false;
@@ -377,6 +378,15 @@ class PlayerController extends ChangeNotifier {
       PlaybackMode.shuffle => PlaybackMode.singleLoop,
       PlaybackMode.singleLoop => PlaybackMode.playlistLoop,
     };
+    if (playbackMode == PlaybackMode.shuffle && queue.isNotEmpty) {
+      final currentIdentity = currentSong == null
+          ? null
+          : _songIdentity(currentSong!);
+      _shuffleCycle.reset(
+        queue.map(_songIdentity).where((identity) => identity.isNotEmpty),
+        current: currentIdentity,
+      );
+    }
     _saveQueueState();
     notifyListeners();
     return playbackMode;
@@ -446,12 +456,14 @@ class PlayerController extends ChangeNotifier {
     _climaxEndTime = null;
     climax = null;
     _completionFallbackTimer?.cancel();
+    _playCacheTimer?.cancel();
+    unawaited(downloadController?.cancelActivePlayCache());
     _completedSongHash = null;
     isPreparing = true;
     _isChangingSource = true;
     errorMessage = null;
     final replacesQueue =
-        queue != null && queue.isNotEmpty && !identical(queue, this.queue);
+        queue != null && queue.isNotEmpty && !_isSameQueue(queue, this.queue);
     currentSong = song;
     if (queue != null && queue.isNotEmpty) {
       this.queue = queue;
@@ -516,11 +528,9 @@ class PlayerController extends ChangeNotifier {
       // 记录播放历史与本地播放统计（后台执行，不阻塞播放）
       unawaited(_historyService.record(song));
       unawaited(_statsService.recordPlay(song));
-      // 首播后后台缓存（仅当本次用的是网络 URL）
+      // 稳定播放 15 秒后再后台缓存（避免快速切歌重复消耗大量流量）
       if (networkUrl != null) {
-        unawaited(
-          downloadController?.cacheForPlayback(song, audioQuality, networkUrl),
-        );
+        _schedulePlayCache(song, audioQuality, networkUrl);
       }
     } catch (error) {
       errorMessage = error.toString();
@@ -1160,10 +1170,10 @@ class PlayerController extends ChangeNotifier {
   }
 
   Future<void> previous() async {
-    final index = currentIndex;
-    if (index > 0) {
+    final prevSong = _previousSong();
+    if (prevSong != null) {
       await playSong(
-        queue[index - 1],
+        prevSong,
         queue: queue,
         preservePersonalFmSession: _isPersonalFmActive,
       );
@@ -1305,11 +1315,9 @@ class PlayerController extends ChangeNotifier {
       if (resumePlayback) {
         await _audioHandler.play();
       }
-      // 切音质后后台缓存
+      // 切音质稳定播放后再后台缓存
       if (networkUrl != null) {
-        unawaited(
-          downloadController?.cacheForPlayback(song, audioQuality, networkUrl),
-        );
+        _schedulePlayCache(song, audioQuality, networkUrl);
       }
     } catch (error) {
       errorMessage = error.toString();
@@ -2093,6 +2101,55 @@ class PlayerController extends ChangeNotifier {
     }
   }
 
+  void _schedulePlayCache(Song song, AudioQuality quality, String networkUrl) {
+    _playCacheTimer?.cancel();
+    _playCacheTimer = Timer(const Duration(seconds: 15), () {
+      if (currentSong?.hash != song.hash || !isPlaying) {
+        return;
+      }
+      unawaited(
+        downloadController?.cacheForPlayback(song, quality, networkUrl),
+      );
+    });
+  }
+
+  Song? _previousSong() {
+    if (queue.isEmpty) {
+      return null;
+    }
+
+    final index = currentIndex;
+    if (_isPersonalFmActive) {
+      if (index > 0) {
+        return queue[index - 1];
+      }
+      return null;
+    }
+    if (playbackMode == PlaybackMode.shuffle) {
+      final currentIdentity = currentSong == null
+          ? null
+          : _songIdentity(currentSong!);
+      final prevIdentity = _shuffleCycle.previous(
+        queue.map(_songIdentity).where((identity) => identity.isNotEmpty),
+        current: currentIdentity,
+      );
+      if (prevIdentity == null) return null;
+      return queue.firstWhere(
+        (song) => _songIdentity(song) == prevIdentity,
+        orElse: () => currentSong ?? queue.first,
+      );
+    }
+
+    if (index > 0) {
+      return queue[index - 1];
+    }
+
+    if (queue.length > 1) {
+      return queue.last;
+    }
+    return null;
+  }
+
   Song? _nextSong() {
     if (queue.isEmpty) {
       return currentSong;
@@ -2228,6 +2285,7 @@ class PlayerController extends ChangeNotifier {
     _pauseListeningTimeTracker();
     _stopPositionSaving();
     _queueSaveTimer?.cancel();
+    _playCacheTimer?.cancel();
     _autoResumeTimer?.cancel();
     _sleepTimer?.cancel();
     _positionSub.cancel();

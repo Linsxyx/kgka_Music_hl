@@ -90,14 +90,32 @@ class MusicApi {
     );
   }
 
-  Future<LoginSession> refreshToken() async {
-    final json = asMap(await _client.post('/login/token'));
+  Future<LoginSession> refreshToken({LoginSession? current}) async {
+    final query = <String, Object?>{};
+    final token = current?.token ?? _client.token;
+    final userId = current?.userId;
+    if (token != null && token.isNotEmpty) {
+      query['token'] = token;
+    }
+    if (userId != null && userId.isNotEmpty && userId != '0') {
+      query['userid'] = userId;
+    }
+    final json = asMap(await _client.post('/login/token', query: query));
     final session = LoginSession.fromJson(json);
+    if (session.token == null || session.token!.isEmpty) {
+      throw ApiException('刷新登录凭证失败${_failureSuffix(json)}');
+    }
     return LoginSession(
-      userId: session.userId,
+      userId: (session.userId != null && session.userId != '0')
+          ? session.userId
+          : userId,
       token: session.token,
-      t1: session.t1,
+      t1: (session.t1 != null && session.t1!.isNotEmpty)
+          ? session.t1
+          : current?.t1 ?? _client.t1,
       sessionId: _client.sessionId,
+      nickname: current?.nickname,
+      avatarUrl: current?.avatarUrl,
     );
   }
 
@@ -971,8 +989,15 @@ class MusicApi {
 
   Future<List<LyricLine>> lyrics(Song song) async {
     _debugLyricLog(
-      'request song="${song.title}" artist="${song.artist}" hash="${song.hash}" albumAudioId="${song.albumAudioId}"',
+      'request song="${song.title}" artist="${song.artist}" hash="${song.hash}" albumAudioId="${song.albumAudioId}" source="${song.source}"',
     );
+    if (song.source == SongSource.netease || song.hash.startsWith('ne_')) {
+      final neteaseLyrics = await _netEaseLyrics(song);
+      if (neteaseLyrics.isNotEmpty) {
+        return neteaseLyrics;
+      }
+    }
+
     final candidate = await _searchLyricCandidate(song);
     _debugLyricLogObject('selected candidate', candidate);
     if (candidate == null) {
@@ -988,16 +1013,57 @@ class MusicApi {
     return _lyricByFormat(candidate, 'lrc');
   }
 
-  Future<Map<String, dynamic>?> _searchLyricCandidate(Song song) async {
-    final query = {'hash': song.hash};
-    _debugLyricLogObject('search query', query);
-    final searchJson = await _client.get('/search/lyric', query);
-    _debugLyricLogObject('search response', searchJson);
+  Future<List<LyricLine>> _netEaseLyrics(Song song) async {
+    final neteaseId = song.id.isNotEmpty && !song.id.startsWith('ne_')
+        ? song.id
+        : song.hash.replaceFirst('ne_', '');
+    if (neteaseId.isEmpty) return const [];
+    try {
+      final uri = Uri.parse('https://wyy.music.api.hoilai.cn').replace(
+        path: '/lyric',
+        queryParameters: {'id': neteaseId},
+      );
+      final raw = await _client.getRaw(uri);
+      final json = asMap(raw);
+      final lrc = asString(asMap(json['lrc'])['lyric']);
+      final tlyric = asString(asMap(json['tlyric'])['lyric']);
+      final romalrc = asString(asMap(json['romalrc'])['lyric']);
+      return parseNetEaseLyrics(lrc: lrc, tlyric: tlyric, romalrc: romalrc);
+    } catch (_) {
+      return const [];
+    }
+  }
 
-    final candidate = _findLyricCandidate(searchJson);
-    if (candidate != null) {
-      _debugLyricLog('search found candidate by hash');
-      return candidate;
+  Future<Map<String, dynamic>?> _searchLyricCandidate(Song song) async {
+    if (song.hash.isNotEmpty && !song.hash.startsWith('ne_')) {
+      final query = <String, Object?>{
+        'hash': song.hash,
+        if (song.albumAudioId != null && song.albumAudioId!.isNotEmpty)
+          'album_audio_id': song.albumAudioId,
+      };
+      _debugLyricLogObject('search query', query);
+      final searchJson = await _client.get('/search/lyric', query);
+      _debugLyricLogObject('search response', searchJson);
+
+      final candidate = _findLyricCandidate(searchJson);
+      if (candidate != null) {
+        _debugLyricLog('search found candidate by hash');
+        return candidate;
+      }
+    }
+
+    final keywords = '${song.artist} ${song.title}'.trim();
+    if (keywords.isNotEmpty && song.title != '未知歌曲') {
+      try {
+        final searchJson = await _client.get('/search/lyric', {
+          'keywords': keywords,
+        });
+        final candidate = _findLyricCandidate(searchJson);
+        if (candidate != null) {
+          _debugLyricLog('search found candidate by keywords');
+          return candidate;
+        }
+      } catch (_) {}
     }
     return null;
   }
@@ -1115,18 +1181,25 @@ List<PlaylistSummary> _orderUserPlaylistsForDisplay(
   return [...playlists.take(2), ...playlists.skip(2).toList().reversed];
 }
 
-List<LyricLine> parseLyrics(String? content) {
-  if (content == null || content.trim().isEmpty) {
-    return const [];
-  }
-
-  final normalized = content
+String _normalizeLyricContent(String content) {
+  return content
       .replaceFirst('\uFEFF', '')
       .replaceAll('\r\n', '\n')
       .replaceAll('\r', '\n')
       .replaceAll(r'\r\n', '\n')
       .replaceAll(r'\n', '\n');
-  final krcLines = _parseKrc(normalized);
+}
+
+List<LyricLine> parseLyrics(String? content) {
+  if (content == null || content.trim().isEmpty) {
+    return const [];
+  }
+
+  final normalized = _normalizeLyricContent(content);
+  final variants = _parseLyricVariants(
+    originalContent: normalized,
+  );
+  final krcLines = _parseKrc(normalized, variants: variants);
   final parsed = krcLines.isNotEmpty
       ? krcLines
       : _mergeSameTimeTranslation(_parseLrc(normalized));
@@ -1134,10 +1207,55 @@ List<LyricLine> parseLyrics(String? content) {
     return const [];
   }
 
-  final variants = _parseLyricVariants(
-    originalContent: normalized,
-  );
   return _mergeLyricVariants(parsed, variants);
+}
+
+List<LyricLine> parseNetEaseLyrics({
+  String? lrc,
+  String? tlyric,
+  String? romalrc,
+}) {
+  if (lrc == null || lrc.trim().isEmpty) {
+    return const [];
+  }
+  final mainLines = _mergeSameTimeTranslation(
+    _parseLrc(_normalizeLyricContent(lrc)),
+  );
+  if (mainLines.isEmpty) {
+    return const [];
+  }
+
+  final transByTime = <int, String>{};
+  if (tlyric != null && tlyric.trim().isNotEmpty) {
+    for (final line in _parseLrc(_normalizeLyricContent(tlyric))) {
+      final text = line.text.trim();
+      if (text.isNotEmpty) {
+        transByTime[line.time.inMilliseconds] = text;
+      }
+    }
+  }
+
+  final romaByTime = <int, String>{};
+  if (romalrc != null && romalrc.trim().isNotEmpty) {
+    for (final line in _parseLrc(_normalizeLyricContent(romalrc))) {
+      final text = line.text.trim();
+      if (text.isNotEmpty) {
+        romaByTime[line.time.inMilliseconds] = text;
+      }
+    }
+  }
+
+  if (transByTime.isEmpty && romaByTime.isEmpty) {
+    return mainLines;
+  }
+
+  return _mergeLyricVariants(
+    mainLines,
+    _ParsedLyricVariants(
+      translation: _TimedLyricVariant(byTime: transByTime),
+      romanization: _TimedLyricVariant(byTime: romaByTime),
+    ),
+  );
 }
 
 /// 合并同一时间戳的相邻歌词行。
@@ -1166,35 +1284,48 @@ List<LyricLine> _mergeSameTimeTranslation(List<LyricLine> lines) {
   return merged;
 }
 
-List<LyricLine> _parseKrc(String content) {
+List<LyricLine> _parseKrc(
+  String content, {
+  _ParsedLyricVariants variants = const _ParsedLyricVariants(),
+}) {
   final lines = <LyricLine>[];
   final offset = _extractOffset(content);
   final lineExpression = RegExp(r'^\[\s*(-?\d+)\s*,\s*(-?\d+)\s*\](.*)$');
   final wordExpression = RegExp(r'<\s*(-?\d+)\s*,\s*(-?\d+)\s*,\s*(-?\d+)\s*>');
 
+  final rawMatchedLines = <RegExpMatch>[];
   for (final rawLine in content.split('\n')) {
     final match = lineExpression.firstMatch(rawLine.trim());
-    if (match == null) {
-      continue;
+    if (match != null) {
+      rawMatchedLines.add(match);
     }
+  }
 
+  final totalRawLines = rawMatchedLines.length;
+  final transByIndex = variants.translation.byIndex;
+  final romaByIndex = variants.romanization.byIndex;
+  final hasDirectTransIndex = transByIndex.length == totalRawLines;
+  final hasDirectRomaIndex = romaByIndex.length == totalRawLines;
+
+  for (var rawIndex = 0; rawIndex < totalRawLines; rawIndex++) {
+    final match = rawMatchedLines[rawIndex];
     final start = int.tryParse(match.group(1) ?? '');
     final duration = int.tryParse(match.group(2) ?? '');
     if (start == null || duration == null) {
       continue;
     }
 
-    final content = match.group(3) ?? '';
+    final lineBody = match.group(3) ?? '';
     final words = <LyricWord>[];
-    final matches = wordExpression.allMatches(content).toList();
+    final matches = wordExpression.allMatches(lineBody).toList();
     for (var index = 0; index < matches.length; index++) {
       final wordMatch = matches[index];
       final wordStart = int.tryParse(wordMatch.group(1) ?? '') ?? 0;
       final wordDuration = int.tryParse(wordMatch.group(2) ?? '') ?? 0;
       final wordEnd = index + 1 < matches.length
           ? matches[index + 1].start
-          : content.length;
-      final wordText = content.substring(wordMatch.end, wordEnd);
+          : lineBody.length;
+      final wordText = lineBody.substring(wordMatch.end, wordEnd);
       if (wordText.isEmpty) {
         continue;
       }
@@ -1215,10 +1346,26 @@ List<LyricLine> _parseKrc(String content) {
 
     final displayWords = _trimLyricWords(words);
     final text = displayWords.isEmpty
-        ? content.replaceAll(wordExpression, '').trim()
+        ? lineBody.replaceAll(wordExpression, '').trim()
         : displayWords.map((word) => word.text).join();
     if (text.isEmpty) {
       continue;
+    }
+
+    String? directTranslation;
+    if (hasDirectTransIndex) {
+      final candidate = transByIndex[rawIndex].trim();
+      if (candidate.isNotEmpty && !_sameLyricText(text, candidate)) {
+        directTranslation = candidate;
+      }
+    }
+
+    String? directRomanization;
+    if (hasDirectRomaIndex) {
+      final candidate = romaByIndex[rawIndex].trim();
+      if (candidate.isNotEmpty && !_sameLyricText(text, candidate)) {
+        directRomanization = candidate;
+      }
     }
 
     lines.add(
@@ -1229,6 +1376,8 @@ List<LyricLine> _parseKrc(String content) {
         duration: Duration(milliseconds: duration.clamp(0, 1 << 31).toInt()),
         text: text,
         words: displayWords,
+        translation: directTranslation,
+        romanization: directRomanization,
       ),
     );
   }
@@ -1473,23 +1622,30 @@ void _collectKrcLanguageRows(
   Object? row,
   int? sectionType,
 ) {
-  if (row is! List || row.isEmpty) {
+  if (row is! List) {
     return null;
+  }
+  if (row.isEmpty) {
+    return (time: null, text: '');
   }
 
-  final time = row.length > 1 ? asInt(row[0]) : null;
-  final values = row.map(asString).whereType<String>().toList();
-  if (values.isEmpty) {
-    return null;
+  final time = row.length == 2 && row[0] is num ? (row[0] as num).toInt() : null;
+  if (time != null) {
+    final text = asString(row[1]) ?? '';
+    return (time: time, text: text);
   }
 
-  final text = time != null && row.length > 1
-      ? asString(row[1])
-      : (sectionType == 0 ? values.join('') : values.join(' ').trim());
-  if (text == null || text.isEmpty) {
-    return null;
-  }
-  return (time: time, text: text);
+  final rawParts = row
+      .map((item) => item == null ? '' : item.toString())
+      .toList();
+  final text = sectionType == 0
+      ? rawParts.join('').trim()
+      : rawParts
+            .map((part) => part.trim())
+            .where((part) => part.isNotEmpty)
+            .join(' ')
+            .trim();
+  return (time: null, text: text);
 }
 
 List<LyricLine> _mergeLyricVariants(
@@ -1517,17 +1673,19 @@ List<LyricLine> _mergeLyricVariants(
       variants.translation.byTime,
     );
     final indexed = indexedTranslations[index];
-    final trans = byTime ?? nearest ?? indexed;
+    final trans = line.translation ?? byTime ?? nearest ?? indexed;
+    final roma =
+        line.romanization ??
+        variants.romanization.byTime[line.time.inMilliseconds] ??
+        _nearestLyricVariant(
+          line.time.inMilliseconds,
+          variants.romanization.byTime,
+        ) ??
+        indexedRomanizations[index];
     merged.add(
       line.copyWith(
         translation: trans,
-        romanization:
-            variants.romanization.byTime[line.time.inMilliseconds] ??
-            _nearestLyricVariant(
-              line.time.inMilliseconds,
-              variants.romanization.byTime,
-            ) ??
-            indexedRomanizations[index],
+        romanization: roma,
       ),
     );
     if (trans != null && trans.isNotEmpty) {

@@ -11,7 +11,11 @@ import '../services/music_api.dart';
 import '../services/vip_background_task.dart';
 
 class AuthController extends ChangeNotifier {
-  AuthController(this._api, this._cacheService);
+  AuthController(this._api, this._cacheService) {
+    _vipBackgroundTask.onClaimSuccess = () {
+      refreshVipInfo();
+    };
+  }
 
   static const _tokenKey = 'ka_music_token';
   static const _t1Key = 'ka_music_t1';
@@ -24,11 +28,14 @@ class AuthController extends ChangeNotifier {
   final CacheService _cacheService;
   late final VipBackgroundTask _vipBackgroundTask = VipBackgroundTask(_api);
 
+  VipBackgroundTask get vipClaim => _vipBackgroundTask;
+
   bool isRestoring = true;
   bool isLoading = false;
   String? errorMessage;
   LoginSession? session;
   UserProfile? profile;
+  UserVipInfo? vipInfo;
   List<PlaylistSummary> playlists = const [];
 
   final Set<String> _likedHashes = {};
@@ -262,10 +269,8 @@ class AuthController extends ChangeNotifier {
       _api.setSession(restored);
 
       try {
-        final refreshed = await _api.refreshToken();
-        if (storedUserId != null &&
-            refreshed.userId != null &&
-            storedUserId != refreshed.userId) {
+        final refreshed = await _api.refreshToken(current: restored);
+        if (_hasMismatchedUserId(storedUserId, refreshed.userId)) {
           await _clearSession();
           return;
         }
@@ -273,7 +278,11 @@ class AuthController extends ChangeNotifier {
         _api.setSession(refreshed);
         await prefs.setString(_tokenKey, refreshed.token ?? '');
         await prefs.setString(_t1Key, refreshed.t1 ?? '');
-        await prefs.setString(_userIdKey, refreshed.userId ?? '');
+        if (refreshed.userId != null &&
+            refreshed.userId!.isNotEmpty &&
+            refreshed.userId != '0') {
+          await prefs.setString(_userIdKey, refreshed.userId!);
+        }
       } catch (_) {
         // /login/token failed, continue with stored token
       }
@@ -288,6 +297,14 @@ class AuthController extends ChangeNotifier {
       );
       if (cachedProfile != null) {
         profile = cachedProfile.data;
+      }
+      final cachedVip = await _cacheService.read<UserVipInfo>(
+        _vipCacheKey,
+        decode: UserVipInfo.fromJson,
+        ttl: AppConfig.userProfileTtl,
+      );
+      if (cachedVip != null) {
+        vipInfo = cachedVip.data;
       }
       // 缓存数据已就绪，立即通知 UI 显示，API 刷新在后台进行
       isRestoring = false;
@@ -312,15 +329,25 @@ class AuthController extends ChangeNotifier {
     return null;
   }
 
+  bool _hasMismatchedUserId(String? storedUserId, String? refreshedUserId) {
+    final stored = storedUserId?.trim() ?? '';
+    final refreshed = refreshedUserId?.trim() ?? '';
+    if (stored.isEmpty ||
+        stored == '0' ||
+        refreshed.isEmpty ||
+        refreshed == '0') {
+      return false;
+    }
+    return stored != refreshed;
+  }
+
   Future<void> refreshSession() async {
     if (session == null) return;
     final prefs = await SharedPreferences.getInstance();
     final storedUserId = prefs.getString(_userIdKey);
     try {
-      final refreshed = await _api.refreshToken();
-      if (storedUserId != null &&
-          refreshed.userId != null &&
-          storedUserId != refreshed.userId) {
+      final refreshed = await _api.refreshToken(current: session);
+      if (_hasMismatchedUserId(storedUserId, refreshed.userId)) {
         await _clearSession();
         return;
       }
@@ -328,7 +355,11 @@ class AuthController extends ChangeNotifier {
       _api.setSession(refreshed);
       await prefs.setString(_tokenKey, refreshed.token ?? '');
       await prefs.setString(_t1Key, refreshed.t1 ?? '');
-      await prefs.setString(_userIdKey, refreshed.userId ?? '');
+      if (refreshed.userId != null &&
+          refreshed.userId!.isNotEmpty &&
+          refreshed.userId != '0') {
+        await prefs.setString(_userIdKey, refreshed.userId!);
+      }
     } catch (_) {
       // Refresh failed, continue with existing session
     }
@@ -356,7 +387,7 @@ class AuthController extends ChangeNotifier {
       // profile/歌单拉取不到。这里先调 /login/token 刷新拿到 t1。
       if (session.t1 == null || session.t1!.isEmpty) {
         try {
-          final refreshed = await _api.refreshToken();
+          final refreshed = await _api.refreshToken(current: session);
           if (refreshed.token != null && refreshed.token!.isNotEmpty) {
             // 合并：保留扫码返回的 nickname/avatar，用刷新结果的 token/t1
             session = LoginSession(
@@ -426,12 +457,42 @@ class AuthController extends ChangeNotifier {
     return result;
   }
 
+  Future<void> refreshVipInfo() async {
+    if (!isLoggedIn) return;
+    try {
+      final latestVip = await _api.vipDetail();
+      vipInfo = latestVip;
+      if (latestVip.userId != null &&
+          latestVip.userId!.isNotEmpty &&
+          latestVip.userId != '0' &&
+          (session?.userId == null ||
+              session!.userId!.isEmpty ||
+              session!.userId == '0')) {
+        session = LoginSession(
+          userId: latestVip.userId,
+          token: session?.token,
+          t1: session?.t1,
+          sessionId: session?.sessionId ?? _api.clientSessionId,
+          nickname: session?.nickname,
+          avatarUrl: session?.avatarUrl,
+        );
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(_userIdKey, latestVip.userId!);
+      }
+      await _cacheService.write(_vipCacheKey, latestVip.toCache());
+      notifyListeners();
+    } catch (_) {
+      // 静默忽略 VIP 查询异常，不影响主资料加载
+    }
+  }
+
   Future<void> refreshProfile({bool silent = false}) async {
     await _run(() async {
       profile = await _api.userDetail();
       if (profile != null) {
         await _cacheService.write(_userCacheKey, profile!.toCache());
       }
+      await refreshVipInfo();
       playlists = await _loadUserPlaylistsWithCache();
       await _syncLikedSongs();
     }, silent: silent);
@@ -576,6 +637,8 @@ class AuthController extends ChangeNotifier {
 
   String get _userCacheKey => 'cache_user_${session?.userId ?? 'default'}';
 
+  String get _vipCacheKey => 'cache_vip_${session?.userId ?? 'default'}';
+
   String get _playlistCacheKeyV2 =>
       'cache_user_playlists_${session?.userId ?? 'default'}';
 
@@ -583,6 +646,7 @@ class AuthController extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     session = null;
     profile = null;
+    vipInfo = null;
     playlists = const [];
     _likedHashes.clear();
     _api.setSession(null);

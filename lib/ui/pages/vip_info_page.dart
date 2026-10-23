@@ -60,12 +60,13 @@ class _VipInfoPageState extends State<VipInfoPage> {
     if (_isClaiming) return;
     setState(() => _isClaiming = true);
     try {
-      final result = await widget.api.dailyVip();
+      final ok = await widget.auth.vipClaim.claimNow(widget.auth.session);
       if (!mounted) return;
-      if (result.status == 1) {
-        Toast.success('领取成功，快去体验 VIP 特权吧');
+      final message = widget.auth.vipClaim.lastMessage;
+      if (ok) {
+        Toast.success(message ?? '签到成功，已升级概念版 VIP');
       } else {
-        Toast.info('今日已领取或暂不可领取');
+        Toast.info(message ?? '今日已领取或暂不可领取');
       }
       await _load();
     } catch (e) {
@@ -75,12 +76,29 @@ class _VipInfoPageState extends State<VipInfoPage> {
     }
   }
 
-  /// 今天是否已领取过 VIP（含后台自动领取）。
+  /// 今天是否已领取且已升级为概念版 VIP。
   bool _isClaimedToday(VipReceiveHistory? history) {
     if (history == null) return false;
     final today = DateTime.now().toIso8601String().split('T').first;
     for (final item in history.items) {
-      if (item.day == today && item.receiveVip == 1) return true;
+      if (item.day == today &&
+          item.receiveVip == 1 &&
+          item.vipType != 'tvip') {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  bool _needsUpgradeToday(VipReceiveHistory? history) {
+    if (history == null) return false;
+    final today = DateTime.now().toIso8601String().split('T').first;
+    for (final item in history.items) {
+      if (item.day == today &&
+          item.receiveVip == 1 &&
+          item.vipType == 'tvip') {
+        return true;
+      }
     }
     return false;
   }
@@ -131,10 +149,22 @@ class _VipInfoPageState extends State<VipInfoPage> {
                       children: [
                         _VipStatusCard(vip: _vip),
                         const SizedBox(height: 16),
-                        _DailyVipCard(
-                          isClaiming: _isClaiming,
-                          claimedToday: _isClaimedToday(_history),
-                          onClaim: _claimDailyVip,
+                        AnimatedBuilder(
+                          animation: widget.auth.vipClaim,
+                          builder: (context, _) => _DailyVipCard(
+                            isClaiming:
+                                _isClaiming || widget.auth.vipClaim.isRunning,
+                            claimedToday: _isClaimedToday(_history),
+                            needsUpgradeToday: _needsUpgradeToday(_history),
+                            autoEnabled: widget.auth.vipClaim.autoEnabled,
+                            lastMessage: widget.auth.vipClaim.lastMessage,
+                            onAutoChanged: (enabled) => widget.auth.vipClaim
+                                .setAutoEnabled(
+                                  enabled,
+                                  session: widget.auth.session,
+                                ),
+                            onClaim: _claimDailyVip,
+                          ),
                         ),
                         if ((_vip?.busiVip.isNotEmpty ?? false)) ...[
                           const SizedBox(height: 24),
@@ -255,24 +285,35 @@ class _VipStatusCard extends StatelessWidget {
   String _statusText(bool isVip) {
     if (!isVip) return '开通后可享受高品质音乐与更多特权';
     final tags = <String>[];
-    if (vip?.isSuperVip == true) tags.add('超级 VIP');
-    if (vip?.isConceptVip == true) tags.add('概念版 VIP');
-    if (tags.isEmpty) tags.add('VIP');
-    final typeText = vip?.vipType != null ? '类型 ${vip!.vipType}' : null;
-    return [tags.join(' · '), ?typeText].join(' · ');
+    if (vip?.hasActiveSuperVip == true) tags.add('豪华 VIP');
+    if (vip?.hasActiveConceptVip == true) tags.add('概念版 VIP');
+    if (tags.isEmpty) tags.add('畅听 VIP');
+    final endTime = vip?.primaryEndTime;
+    final endText = endTime != null && endTime.isNotEmpty
+        ? '$endTime 到期'
+        : null;
+    return [tags.join(' · '), ?endText].join(' · ');
   }
 }
 
-/// 每日 VIP 领取卡片。
+/// 每日 VIP 领取卡片（含自动签到开关）。
 class _DailyVipCard extends StatelessWidget {
   const _DailyVipCard({
     required this.isClaiming,
     required this.claimedToday,
+    required this.needsUpgradeToday,
+    required this.autoEnabled,
+    this.lastMessage,
+    required this.onAutoChanged,
     required this.onClaim,
   });
 
   final bool isClaiming;
   final bool claimedToday;
+  final bool needsUpgradeToday;
+  final bool autoEnabled;
+  final String? lastMessage;
+  final ValueChanged<bool> onAutoChanged;
   final VoidCallback onClaim;
 
   @override
@@ -284,39 +325,91 @@ class _DailyVipCard extends StatelessWidget {
         color: colorScheme.surfaceContainer,
         borderRadius: BorderRadius.circular(AppRadius.lg),
       ),
-      child: Row(
+      child: Column(
         children: [
-          Icon(Icons.card_giftcard_rounded, color: colorScheme.primary, size: 32),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '每日 VIP 福利',
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
+          Row(
+            children: [
+              Icon(
+                Icons.card_giftcard_rounded,
+                color: colorScheme.primary,
+                size: 32,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '每日 VIP 福利',
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      claimedToday
+                          ? '今日概念版 VIP 福利已领取，明天再来吧'
+                          : needsUpgradeToday
+                          ? '已领畅听 VIP，点击继续升级概念版 VIP'
+                          : (lastMessage ?? '每天签到可自动领取并升级为概念版 VIP'),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  claimedToday ? '今日福利已领取，明天再来吧' : '每天可领取一次体验 VIP',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ),
+              ),
+              const SizedBox(width: 12),
+              FilledButton(
+                onPressed: isClaiming || claimedToday ? null : onClaim,
+                child: isClaiming
+                    ? const SizedBox.square(
+                        dimension: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2.2),
+                      )
+                    : Text(
+                        claimedToday
+                            ? '今日已领取'
+                            : needsUpgradeToday
+                            ? '升级概念版'
+                            : '立即签到',
+                      ),
+              ),
+            ],
           ),
-          const SizedBox(width: 12),
-          FilledButton(
-            onPressed: isClaiming || claimedToday ? null : onClaim,
-            child: isClaiming
-                ? const SizedBox.square(
-                    dimension: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2.2),
-                  )
-                : Text(claimedToday ? '今日已领取' : '领取'),
+          const Divider(height: 24),
+          Row(
+            children: [
+              Icon(
+                Icons.autorenew_rounded,
+                color: colorScheme.primary,
+                size: 22,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '自动签到领取概念版 VIP',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    Text(
+                      '每日打开应用自动签到并升级为概念版 VIP',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Switch(
+                value: autoEnabled,
+                onChanged: onAutoChanged,
+              ),
+            ],
           ),
         ],
       ),
@@ -379,6 +472,13 @@ class _BusiVipTile extends StatelessWidget {
                 if (info.productType case final product?)
                   Text(
                     '产品：$product',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                if (info.vipEndTime case final endTime? when endTime.isNotEmpty)
+                  Text(
+                    '到期：$endTime',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: colorScheme.onSurfaceVariant,
                     ),

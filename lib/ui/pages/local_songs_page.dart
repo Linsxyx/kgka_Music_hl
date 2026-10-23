@@ -3,10 +3,12 @@ import 'package:flutter/material.dart';
 import '../widgets/liquid_glass_ui.dart';
 import '../design_tokens.dart';
 import '../adaptive_layout.dart';
+import '../../controllers/auth_controller.dart';
 import '../../controllers/player_controller.dart';
 import '../../controllers/local_music_controller.dart';
 import '../widgets/toast.dart';
 import '../widgets/artwork.dart';
+import '../widgets/mini_player.dart';
 import '../widgets/now_playing_badge.dart';
 import '../widgets/status_bar_overlay.dart';
 
@@ -15,10 +17,12 @@ class LocalSongsPage extends StatefulWidget {
     super.key,
     required this.player,
     required this.localMusic,
+    this.auth,
   });
 
   final PlayerController player;
   final LocalMusicController localMusic;
+  final AuthController? auth;
 
   @override
   State<LocalSongsPage> createState() => _LocalSongsPageState();
@@ -432,6 +436,19 @@ class _LocalSongsPageState extends State<LocalSongsPage> {
           },
         ),
       ),
+      bottomNavigationBar: widget.auth == null
+          ? null
+          : SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: MiniPlayer(
+                  player: widget.player,
+                  auth: widget.auth!,
+                ),
+              ),
+            ),
+      extendBody: true,
       ),
       ),
     );

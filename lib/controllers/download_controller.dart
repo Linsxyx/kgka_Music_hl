@@ -458,16 +458,43 @@ class DownloadController extends ChangeNotifier {
 
   // ===== 播放缓存 =====
 
-  /// 后台缓存当前播放歌曲（首播后调用）。url 来自 songUrl 结果。
+  String? _activePlayCacheKey;
+
+  /// 取消当前正在进行的后台播放缓存传输（切歌时调用，避免快速切歌浪费流量）。
+  Future<void> cancelActivePlayCache() async {
+    final activeKey = _activePlayCacheKey;
+    if (activeKey == null) return;
+    _activePlayCacheKey = null;
+    final isManualDownload = _downloads.values.any(
+      (entry) =>
+          entry.status == DownloadStatus.downloading &&
+          _service.cacheKeyFor(entry.song, entry.quality) == activeKey,
+    );
+    if (!isManualDownload) {
+      await _service.cancel(activeKey);
+    }
+  }
+
+  /// 后台缓存当前播放歌曲（稳定播放后调用）。url 来自 songUrl 结果。
   Future<void> cacheForPlayback(
     Song song,
     AudioQuality quality,
     String url,
   ) async {
+    if (_playCacheLimit <= 0) return;
     final key = _service.cacheKeyFor(song, quality);
-    // 已有缓存或已在下载则跳过
+    // 已有缓存或已下载/正在下载则跳过
     if (_playCache[key] != null) return;
-    if (_downloads[song.hash]?.status == DownloadStatus.downloading) return;
+    final downloadStatus = _downloads[song.hash]?.status;
+    if (downloadStatus == DownloadStatus.downloading ||
+        downloadStatus == DownloadStatus.downloaded) {
+      return;
+    }
+
+    if (_activePlayCacheKey != null && _activePlayCacheKey != key) {
+      await cancelActivePlayCache();
+    }
+    _activePlayCacheKey = key;
 
     try {
       final path = await _service.cacheForPlayback(
@@ -476,6 +503,7 @@ class DownloadController extends ChangeNotifier {
         url: url,
       );
       final size = await _service.fileSize(path);
+      if (size <= 0) return;
       _playCache[key] = PlayCacheEntry(
         cacheKey: key,
         song: song,
@@ -490,6 +518,10 @@ class DownloadController extends ChangeNotifier {
       await _prunePlayCache(excludePaths: {path});
     } catch (_) {
       // 播放缓存失败静默忽略
+    } finally {
+      if (_activePlayCacheKey == key) {
+        _activePlayCacheKey = null;
+      }
     }
   }
 

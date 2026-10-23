@@ -185,6 +185,7 @@ class SettingsPage extends StatelessWidget {
           body: AnimatedBuilder(
             animation: Listenable.merge([
               auth,
+              auth.vipClaim,
               player,
               ?localMusic,
               theme,
@@ -213,8 +214,22 @@ class SettingsPage extends StatelessWidget {
                       icon: Icons.workspace_premium_rounded,
                       iconColor: const Color(0xFFE8A33D),
                       title: '我的 VIP',
-                      subtitle: 'VIP 状态与每日福利',
+                      subtitle: auth.vipInfo?.hasActiveVip == true
+                          ? '${auth.vipInfo!.displayLabel}${auth.vipInfo!.primaryEndTime != null ? ' · ${auth.vipInfo!.primaryEndTime} 到期' : ''}'
+                          : 'VIP 状态与每日福利',
                       onTap: () => _openVipInfo(context),
+                    ),
+                    _SettingsDivider(),
+                    _SettingsSwitchTile(
+                      icon: Icons.card_giftcard_rounded,
+                      iconColor: const Color(0xFFE8A33D),
+                      title: '自动签到领取 VIP',
+                      subtitle: auth.vipClaim.lastMessage ?? '每日打开应用自动签到并升级概念版 VIP',
+                      value: auth.vipClaim.autoEnabled,
+                      onChanged: (enabled) => auth.vipClaim.setAutoEnabled(
+                        enabled,
+                        session: auth.session,
+                      ),
                     ),
                     _SettingsDivider(),
                     _SettingsTile(
